@@ -23,6 +23,9 @@ I'll use **C++20** and most likely this will be a CLI-app
 
 DAY 2: 
     Got the most basic cmake configuration setup and hello world up.
-    git submodule add https://github.com/gabime/spdlog.git third_party/spdlog
-    git submodule update --init --recursive
+    git submodule add https://github.com/gabime/spdlog.git third_party/spdlog (UPDATE: we fetch with fetchContent)
+    REMEMBER TO RUN THIS:    git submodule update --init --recursive
+    NEXT would be to write the most basic matching engine as a static library and a test target who will be the first to consume it
+
+
     
