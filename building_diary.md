@@ -7,7 +7,7 @@ progressive infrastructure I consider out-of-scope for now (although these proje
 
 STEP 1:
    
-I'll use **CMmake build system** and compile the project with **Clang and g++**
+I'll use **CMake build system** and compile the project with **Clang and g++**
 I'll use **C++20** and most likely this will be a CLI-app
 
     Setup the basic repository structure (src, tests, third_party)
@@ -20,4 +20,9 @@ I'll use **C++20** and most likely this will be a CLI-app
     this sometimes turned out to be a pain in the neck importing later so i'd rather get
     it out of the way first.
 
+
+DAY 2: 
+    Got the most basic cmake configuration setup and hello world up.
+    git submodule add https://github.com/gabime/spdlog.git third_party/spdlog
+    git submodule update --init --recursive
     
