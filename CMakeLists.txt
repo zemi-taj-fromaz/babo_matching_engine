@@ -26,3 +26,8 @@ target_sources(babo_matching_engine
 )
 
 target_link_libraries(babo_matching_engine PRIVATE spdlog::spdlog)
+
+# --- Precompiled header ---
+# spdlog must be linked BEFORE this line so its include dir is known when
+# the PCH (which includes <spdlog/spdlog.h>) is compiled.
+target_precompile_headers(babo_matching_engine PRIVATE src/pch.hpp)
