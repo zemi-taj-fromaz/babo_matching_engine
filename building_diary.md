@@ -28,4 +28,7 @@ DAY 2:
     NEXT would be to write the most basic matching engine as a static library and a test target who will be the first to consume it
 
 
+# 17th June 2026
     
+    Exploring and reading matching-algorithms.
+    Limiting the scope to outright matching ( implied matching may be done sometimes in the future or as an extension to this project) 
