@@ -2,13 +2,14 @@
 # Your own order book + matching algorithm. Currently a stub (see src) -- this
 # is the library you'll be writing.
 add_library(babo_book STATIC
-        src/order_book.cpp
+        src/simple_order.cpp
         include/book/types.h
-        include/book/order_tracker.h
-        include/book/order_book.h
         include/book/comparable_price.h
         include/book/callback.h
+        include/book/order.hpp
+        include/book/order_tracker.h
         include/book/order_listener.h
+        include/book/order_book.h
         include/book/order_book_listener.h
         include/book/trade_listener.h
         include/book/logger.h
@@ -18,6 +19,9 @@ add_library(babo_book STATIC
         include/book/depth_listener.h
         include/book/depth_order_book.h
         include/book/bbo_listener.h
+        include/simple/simple_order.h
+        include/simple/simple_order_book.h
+        include/book/fastmap.h
 )
 
 target_include_directories(babo_book PUBLIC
