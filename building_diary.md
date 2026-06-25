@@ -32,3 +32,23 @@ DAY 2:
     
     Exploring and reading matching-algorithms.
     Limiting the scope to outright matching ( implied matching may be done sometimes in the future or as an extension to this project) 
+
+# 18th June 2026
+
+    Plan: re-implement liquibook (https://github.com/enewhuis/liquibook),
+        a famous open-source matching engine 
+        " It provides a high-performance solution for matching buy and sell orders in financial markets."
+        "Liquibook is optimized for ultra-low latency and high-throughput order matching, achieving millions of operations per second on standard hardware with full correctness and thread-safety."
+
+        Test with Boost unit-test and measure performance while stress-testing.
+    THEN: 
+        Implement a cache-aware improvement for order-book data structure
+        based on ideas given in this paper(https://arxiv.org/abs/2606.01183)
+        on arxiv.org, then compare the perfomances, possibly on multiple devices.
+
+    
+    Original liquibook implementation is 2 multimaps (one map for buy orders and one for sell orders).
+    Some exchanges use a bit more advanced version of this with orders for the same price level organized in a linked list.
+
+    Continuing to research the paper and defining exact implementation ideas.
+

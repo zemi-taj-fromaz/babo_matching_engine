@@ -31,3 +31,12 @@ target_link_libraries(babo_matching_engine PRIVATE spdlog::spdlog)
 # spdlog must be linked BEFORE this line so its include dir is known when
 # the PCH (which includes <spdlog/spdlog.h>) is compiled.
 target_precompile_headers(babo_matching_engine PRIVATE src/pch.hpp)
+
+# --- Static libraries to compare ---
+# liquibook_ref: vendored reference engine (in-tree, frozen baseline).
+# babo_book:     your own engine (you'll be writing this).
+add_subdirectory(libs/liquibook_ref)
+add_subdirectory(libs/babo_book)
+
+# --- Benchmark / comparison harness ---
+add_subdirectory(bench)
