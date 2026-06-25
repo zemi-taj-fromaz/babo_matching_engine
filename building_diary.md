@@ -52,3 +52,7 @@ DAY 2:
 
     Continuing to research the paper and defining exact implementation ideas.
 
+25th June 2026
+    
+    TODO - check comparison operators and std::format with ostream operator overloading - c++20 has smoother ways to do this
+

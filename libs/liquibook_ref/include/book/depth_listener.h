@@ -3,8 +3,6 @@
 // See the file license.txt for licensing information.
 #pragma once
 
-#include "order_book.h"
-
 namespace liquibook { namespace book {
 
 /// @brief listener of depth events.  Implement to build an aggregate depth 

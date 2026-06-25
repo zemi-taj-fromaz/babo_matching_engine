@@ -3,6 +3,21 @@
 # is the library you'll be writing.
 add_library(babo_book STATIC
         src/order_book.cpp
+        include/book/types.h
+        include/book/order_tracker.h
+        include/book/order_book.h
+        include/book/comparable_price.h
+        include/book/callback.h
+        include/book/order_listener.h
+        include/book/order_book_listener.h
+        include/book/trade_listener.h
+        include/book/logger.h
+        include/book/depth_constants.h
+        include/book/depth_level.h
+        include/book/depth.h
+        include/book/depth_listener.h
+        include/book/depth_order_book.h
+        include/book/bbo_listener.h
 )
 
 target_include_directories(babo_book PUBLIC
