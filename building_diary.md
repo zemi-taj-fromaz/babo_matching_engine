@@ -56,3 +56,8 @@ DAY 2:
     
     TODO - check comparison operators and std::format with ostream operator overloading - c++20 has smoother ways to do this
 
+"Sparse / one-indicator-per-slot je samo evaluirana realizacija"
+
+Paper kaže da indikator ne mora biti materijaliziran 1-po-slotu: ako neki rang trenutno nije relevantan (npr. duboko u repu levela koji se neće matchati), smiješ ga ostaviti neutralnim/odsutnim i ne održavati dok ne zatreba ("ne računaj što ne čitaš"). Mi krećemo s punim 1-po-slotu (najjednostavnije), sparse je optimizacija za poslije
+
+TODO - implementiraj u PIN i ostale algoritme umjesto FIFO (pro-rata)
