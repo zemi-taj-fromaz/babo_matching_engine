@@ -22,7 +22,9 @@ add_library(babo_book STATIC
         include/simple/simple_order.h
         include/simple/simple_order_book.h
         include/book/multimap.h
-        include/data_structures/pin.h
+        include/data_structures/pin_node.h
+        include/data_structures/price_level_descriptor.h
+        include/data_structures/global_pin_chain.h
 )
 
 target_include_directories(babo_book PUBLIC

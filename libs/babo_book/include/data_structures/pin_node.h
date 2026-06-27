@@ -5,10 +5,10 @@
 #ifndef BABOMATCHINGENGINE_PIN_H
 #define BABOMATCHINGENGINE_PIN_H
 
-#include <array>
 #include <cassert>
 #include <cstdint>
 #include <utility>
+#include <vector>
 
 namespace babo {
 
@@ -21,24 +21,26 @@ namespace babo {
 //
 // This is the single node only. Cross-node relocation cascades (Push Back/Forward, H_max) and
 // depth-aware capacity C(d) live in the chain layer built on top of this.
-template <class T, std::uint16_t C>
+template <class T>
 class pin_node {
 public:
 	using slot_type = std::uint16_t;
 	static constexpr slot_type npos = static_cast<slot_type>(-1);
 
-	static_assert(C > 0 && C < npos, "capacity out of range");
-
-	pin_node() noexcept {
+	// Capacity C is a runtime value (depth-aware: C(d)), fixed for this node's lifetime.
+	// Sized once here; slots are never reallocated, so payload addresses stay stable.
+	explicit pin_node(slot_type capacity)
+		: slots_(capacity), links_(capacity), cap_(capacity) {
+		assert(capacity > 0 && capacity < npos && "capacity out of range");
 		// Thread the free list through links_[].next.
-		for (slot_type i = 0; i < C; ++i) links_[i].next = static_cast<slot_type>(i + 1);
-		links_[C - 1].next = npos;
+		for (slot_type i = 0; i < cap_; ++i) links_[i].next = static_cast<slot_type>(i + 1);
+		links_[cap_ - 1].next = npos;
 	}
 
 	[[nodiscard]] bool empty() const noexcept { return size_ == 0; }
-	[[nodiscard]] bool full() const noexcept { return size_ == C; }
+	[[nodiscard]] bool full() const noexcept { return size_ == cap_; }
 	[[nodiscard]] slot_type size() const noexcept { return size_; }
-	[[nodiscard]] static constexpr slot_type capacity() noexcept { return C; }
+	[[nodiscard]] slot_type capacity() const noexcept { return cap_; }
 
 	// Priority-order navigation: head = highest priority, tail = lowest. next() walks toward the
 	// tail (decreasing priority), prev() toward the head. npos terminates in either direction.
@@ -127,8 +129,14 @@ private:
 		tail_ = s;
 	}
 
-	std::array<T, C> slots_{};    // contiguous payload region (base + stride; never moved)
-	std::array<link, C> links_{}; // per-slot priority indicator (intrusive order links)
+	// Inter-node chain links (used by the chain layer). Named *_node to avoid
+	// colliding with the next()/prev() slot-navigation methods above.
+	pin_node* next_node = nullptr;
+	pin_node* prev_node = nullptr;
+
+	std::vector<T> slots_;        // contiguous payload region (base + stride; never moved)
+	std::vector<link> links_;     // per-slot priority indicator (intrusive order links)
+	slot_type cap_;               // capacity C(d); set once in ctor, never changes
 	slot_type head_ = npos;
 	slot_type tail_ = npos;
 	slot_type free_ = 0;          // free-list head, threaded through links_[].next
