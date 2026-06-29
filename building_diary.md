@@ -61,3 +61,10 @@ DAY 2:
 Paper kaže da indikator ne mora biti materijaliziran 1-po-slotu: ako neki rang trenutno nije relevantan (npr. duboko u repu levela koji se neće matchati), smiješ ga ostaviti neutralnim/odsutnim i ne održavati dok ne zatreba ("ne računaj što ne čitaš"). Mi krećemo s punim 1-po-slotu (najjednostavnije), sparse je optimizacija za poslije
 
 TODO - implementiraj u PIN i ostale algoritme umjesto FIFO (pro-rata)
+
+TODO - insert u narb_tree provjerava prvo od min/max pa do nekog level pred/succ _> 
+        eksperimentiraj s ovim level (80% ordera zivi u prvih 10 price level-a tako da to je pocetak negdje rekao bih)
+
+TODO - start with fixed capacity and move on to flexibile capacity after that
+
+TODO - allocation pool for PINs?

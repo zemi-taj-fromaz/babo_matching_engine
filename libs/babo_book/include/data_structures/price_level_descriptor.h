@@ -10,23 +10,27 @@
 
 namespace babo  {
 
-template <class T>
 struct order_loc
 {
-    pin_node<T>* pin_loc;
+    pin_node* pin_loc;
     uint32_t index;
 };
 
-template <class T>
+enum class color : uint8_t {RED, BLACK};
+
 struct price_level_descriptor
 {
-    using Depth = std::uint32_t;
 
-    book::Price price;
-    book::Quantity quantity;
-    Depth depth;
-    order_loc<T> head;
-    order_loc<T> tail;
+    price_level_descriptor *left, *right, *parent;
+    price_level_descriptor *pred, *succ;
+
+    color _color;
+    uint64_t _price;
+    uint32_t _quantity;
+    uint32_t _depth;
+
+    order_loc _head;
+    order_loc _tail;
 };
 
 }
