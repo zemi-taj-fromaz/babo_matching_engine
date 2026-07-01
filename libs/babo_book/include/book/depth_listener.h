@@ -18,7 +18,7 @@ public:
       const typename OrderBook::DepthTracker* depth) = 0;
 };
 
-} }
+}
 
 
 

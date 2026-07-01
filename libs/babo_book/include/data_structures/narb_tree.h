@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <iterator>
 #include <type_traits>
+#include <unordered_map>
 
 namespace babo
 {
@@ -108,15 +109,22 @@ public:
     //  Branch 2 (general): find_neighbors, then place into an existing level or a new one.
     void insert(simple::SimpleOrder& order);
 
+    // O(1) cancel by order id: locate the slot, unlink it from the PIN chain, and
+    // clean up an emptied node (and, if the level empties, the level).
+    void erase(std::uint32_t order_id);
+
 
 private:
     // Allocate + initialise a new price level for the given price.
     price_level_descriptor* make_level(std::uint64_t price);
-    // Add an order into a level's PIN chain (and update the level's aggregates).
+    // Add an order into a level's PIN chain, record it in the order index.
     void place_order(price_level_descriptor* level, simple::SimpleOrder& order);
 
-    price_level_descriptor* _best;
-    price_level_descriptor* _root;
+    // order id -> resting location, for O(1) cancel.
+    std::unordered_map<std::uint32_t, order_loc> _order_index;
+
+    price_level_descriptor* _best = nullptr;
+    price_level_descriptor* _root = nullptr;
 
     std::uint32_t _node_capacity{};
 
@@ -153,6 +161,42 @@ search_result narb_tree<type>::find_neighbors(std::uint64_t price)
     }
 
     return {nullptr, nullptr, nullptr};
+}
+
+template <order_type type>
+void narb_tree<type>::left_rotate(price_level_descriptor* node)
+{
+    // node's right child takes node's place; node descends to the left.
+    price_level_descriptor* pivot = node->right;
+
+    node->right = pivot->left;
+    if (pivot->left) pivot->left->parent = node;
+
+    pivot->parent = node->parent;
+    if (!node->parent)                     _root = pivot;
+    else if (node == node->parent->left)   node->parent->left = pivot;
+    else                                   node->parent->right = pivot;
+
+    pivot->left = node;
+    node->parent = pivot;
+}
+
+template <order_type type>
+void narb_tree<type>::right_rotate(price_level_descriptor* node)
+{
+    // Mirror of left_rotate: node's left child takes node's place.
+    price_level_descriptor* pivot = node->left;
+
+    node->left = pivot->right;
+    if (pivot->right) pivot->right->parent = node;
+
+    pivot->parent = node->parent;
+    if (!node->parent)                     _root = pivot;
+    else if (node == node->parent->right)  node->parent->right = pivot;
+    else                                   node->parent->left = pivot;
+
+    pivot->right = node;
+    node->parent = pivot;
 }
 
 template <order_type type>
@@ -269,32 +313,59 @@ void narb_tree<type>::insert(simple::SimpleOrder& order)
             return;
         }
 
+        // (a2) more aggressive than best -> new top of book (O(1)).
+        // bids: better = higher price ; asks: better = lower price.
+        bool better_than_best;
+        if constexpr (type == order_type::BID) better_than_best = price > _best->_price;
+        else                                   better_than_best = price < _best->_price;
+        if (better_than_best)
+        {
+            price_level_descriptor* level = make_level(price);
+            place_order(level, order);
+            // The new level sits immediately beyond the old best on the aggressive side,
+            // so the old best is its only neighbour (numerically: bids -> old best is the
+            // lower/pred side, asks -> the higher/succ side). neighbor_aware_insert then
+            // promotes it to _best (it has no succ for bids / no pred for asks).
+            if constexpr (type == order_type::BID) neighbor_aware_insert(level, /*pred=*/_best, /*succ=*/nullptr);
+            else                                   neighbor_aware_insert(level, /*pred=*/nullptr, /*succ=*/_best);
+            return;
+        }
+
         // The second-best level is one step toward worse price.
         // bids: worse = lower price = pred ; asks: worse = higher price = succ.
         price_level_descriptor* next =
             (type == order_type::BID) ? _best->pred : _best->succ;
 
-        if (next)
+        // (a3) best has no worse neighbour -> it is the ONLY level, and (having passed
+        // (a)/(a2)) price is worse than best. Splice the new level straight onto best's
+        // worse side. O(1), no traversal. Mirrors find_neighbors' single-node result.
+        if (!next)
         {
-            // (b) same price as the second-best level.
-            if (price == next->_price)
-            {
-                place_order(next, order);
-                return;
-            }
+            price_level_descriptor* level = make_level(price);
+            place_order(level, order);
+            if constexpr (type == order_type::BID) neighbor_aware_insert(level, /*pred=*/nullptr, /*succ=*/_best);
+            else                                   neighbor_aware_insert(level, /*pred=*/_best,    /*succ=*/nullptr);
+            return;
+        }
 
-            // (c) strictly between best and second-best -> new level in the gap.
-            // find_neighbors/neighbor_aware_insert use raw price (pred = lower price,
-            // succ = higher price), so just pass the numeric lower/higher of the two.
-            price_level_descriptor* lo = (_best->_price < next->_price) ? _best : next;
-            price_level_descriptor* hi = (_best->_price < next->_price) ? next : _best;
-            if (price > lo->_price && price < hi->_price)
-            {
-                price_level_descriptor* level = make_level(price);
-                place_order(level, order);
-                neighbor_aware_insert(level, /*pred=*/lo, /*succ=*/hi);
-                return;
-            }
+        // (b) same price as the second-best level.
+        if (price == next->_price)
+        {
+            place_order(next, order);
+            return;
+        }
+
+        // (c) strictly between best and second-best -> new level in the gap.
+        // find_neighbors/neighbor_aware_insert use raw price (pred = lower price,
+        // succ = higher price), so just pass the numeric lower/higher of the two.
+        price_level_descriptor* lo = (_best->_price < next->_price) ? _best : next;
+        price_level_descriptor* hi = (_best->_price < next->_price) ? next : _best;
+        if (price > lo->_price && price < hi->_price)
+        {
+            price_level_descriptor* level = make_level(price);
+            place_order(level, order);
+            neighbor_aware_insert(level, /*pred=*/lo, /*succ=*/hi);
+            return;
         }
     }
 
@@ -325,17 +396,37 @@ price_level_descriptor* narb_tree<type>::make_level(std::uint64_t price)
     level->_price = price;
     level->_quantity = 0;
     level->_depth = 0;
-    // TODO: initialise the PIN chain (_head/_tail) once pin_node has allocation + insert.
+    level->_head = {nullptr, 0};  // empty PIN chain; first insert allocates the node
+    level->_tail = {nullptr, 0};
     return level;
 }
 
 template <order_type type>
 void narb_tree<type>::place_order(price_level_descriptor* level, simple::SimpleOrder& order)
 {
-    // TODO: append `order` into this level's PIN chain once pin_node exposes insert methods,
-    //       and set/extend level->_head / level->_tail (order_loc) accordingly.
-    // For now we only maintain the level's aggregate open quantity.
-    level->_quantity += order.open_qty();
+    // Read the id before insert moves the order into its slot, then record where it landed.
+    const std::uint32_t id = order.order_id_;
+    const order_loc loc = level->insert(order);   // appends into the level's PIN chain
+    _order_index[id] = loc;
+}
+
+template <order_type type>
+void narb_tree<type>::erase(std::uint32_t order_id)
+{
+    auto it = _order_index.find(order_id);
+    if (it == _order_index.end()) return;   // unknown / already cancelled
+
+    const order_loc loc = it->second;
+    price_level_descriptor* level = loc.pin_loc->level();   // owning level (back-pointer)
+    _order_index.erase(it);
+
+    const bool level_empty = level->remove(loc);   // unlink slot + rewire PIN chain
+    if (level_empty)
+    {
+        // The price level has no more orders. It must be removed from the tree.
+        // TODO: RB-delete `level` (fixup pred/succ threads, _best, and free the descriptor).
+        //       Until RB-delete exists, the empty descriptor stays in the tree as a zombie.
+    }
 }
 
 }

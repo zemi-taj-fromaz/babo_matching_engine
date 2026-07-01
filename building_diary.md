@@ -70,3 +70,5 @@ TODO - start with fixed capacity and move on to flexibile capacity after that
 TODO - allocation pool for PINs? (in pin_node.h instead of vector use arena)
 
 TODO -> write down rules for pre-decrement and post-decrement as well 
+
+ALLOCATION POOL - za fixed size N postavljamo kad je fixed capacity, a N=1 akda imamo flexible capacity

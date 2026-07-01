@@ -11,6 +11,19 @@
 
 namespace babo::simple {
 
+SimpleOrder::SimpleOrder()
+: state_(os_new),
+  is_buy_(false),
+  order_qty_(0),
+  price_(0),
+  stop_price_(0),
+  conditions_(0),
+  filled_qty_(0),
+  filled_cost_(0),
+  reserved_(0),
+  order_id_(0)   // 0 = "no order" sentinel; real ids start at 1
+{
+}
 
 SimpleOrder::SimpleOrder(
   bool is_buy,
@@ -35,6 +48,12 @@ const OrderState&
 SimpleOrder::state() const
 {
   return state_;
+}
+
+bool
+SimpleOrder::is_limit() const
+{
+  return price() > 0;
 }
 
 bool

@@ -24,6 +24,7 @@ add_library(babo_book STATIC
         include/data_structures/pin_node.h
         include/data_structures/price_level_descriptor.h
         include/data_structures/narb_tree.h
+        include/memory/memory_pool.h
 )
 
 target_include_directories(babo_book PUBLIC

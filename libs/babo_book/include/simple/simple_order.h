@@ -2,8 +2,6 @@
 #define BABOMATCHINGENGINE_SIMPLE_ORDER_H
 
 
-#define LIQUIBOOK_ORDER_KNOWS_CONDITIONS
-#include <book/order.hpp>
 #include <book/types.h>
 
 namespace babo::simple {
@@ -16,9 +14,14 @@ enum OrderState {
   os_rejected
 };
 
-/// @brief impelementation of the Order interface for testing purposes.
-class SimpleOrder : public book::Order {
+/// @brief a concrete, non-polymorphic order stored by value in the book's PIN slots.
+class SimpleOrder {
 public:
+  /// @brief default ctor -- produces an empty placeholder order (order_id_ == 0).
+  /// Needed so orders can live by value in pin_node's pre-sized slot region;
+  /// placeholder slots are never reached because their links stay npos.
+  SimpleOrder();
+
   SimpleOrder(bool is_buy,
               uint32_t price,
               uint32_t qty,
@@ -28,19 +31,22 @@ public:
   /// @brief get the order's state
   const OrderState& state() const;
 
+  /// @brief is this a limit order? (has a positive price)
+  bool is_limit() const;
+
   /// @brief is this order a buy?
-  virtual bool is_buy() const;
+  bool is_buy() const;
 
   /// @brief get the limit price of this order
-  virtual uint32_t price() const;
+  uint32_t price() const;
 
-  virtual uint32_t stop_price()const;
+  uint32_t stop_price()const;
 
   /// @brief get the quantity of this order
-  virtual uint32_t order_qty() const;
+  uint32_t order_qty() const;
 
   /// @brief get the open quantity of this order (remaining, minus any reserved)
-  virtual uint32_t open_qty() const;
+  uint32_t open_qty() const;
 
   /// @brief tentatively set aside (reserve) quantity during AON deferred-match
   /// planning, without filling it. Lowers the reported open_qty() so the same
@@ -57,7 +63,7 @@ public:
   void change_qty(int32_t delta);
 
   /// @brief get the filled quantity of this order
-  virtual const uint32_t& filled_qty() const;
+  const uint32_t& filled_qty() const;
 
   /// @brief get the total filled cost of this order
   const uint32_t& filled_cost() const;
@@ -66,21 +72,21 @@ public:
   /// @param fill_qty the number of shares in this fill
   /// @param fill_cost the total amount of this fill
   /// @fill_id the unique identifier of this fill
-  virtual void fill(uint32_t fill_qty,
+  void fill(uint32_t fill_qty,
                     uint32_t fill_cost,
                     uint32_t fill_id);
 
   /// @brief get order conditions as a bit mask
-  virtual book::OrderConditions conditions() const;
+  book::OrderConditions conditions() const;
 
   /// @brief if no trades should happen until the order
   /// can be filled completely.
   /// Note: one or more trades may be used to fill the order.
-  virtual bool all_or_none() const;
+  bool all_or_none() const;
 
   /// @brief After generating as many trades as possible against
   /// orders already on the market, cancel any remaining quantity.
-  virtual bool immediate_or_cancel() const;
+  bool immediate_or_cancel() const;
 
   /// @brief exchange accepted this order
   void accept();
@@ -105,7 +111,7 @@ private:
   inline static uint32_t last_order_id_{0};
 
 public:
-  const uint32_t order_id_;
+  uint32_t order_id_;   // non-const so orders are assignable into pin_node slots
 };
 
 }
