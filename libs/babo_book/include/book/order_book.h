@@ -1,13 +1,14 @@
 #ifndef BABOMATCHINGENGINE_ORDER_BOOK_H
 #define BABOMATCHINGENGINE_ORDER_BOOK_H
 
-#include "order_tracker.h"
 #include "callback.h"
 #include "order_listener.h"
 #include "order_book_listener.h"
 #include "trade_listener.h"
 #include "comparable_price.h"
 #include "logger.h"
+
+#include "../data_structures/price_level_descriptor.h"
 
 #include <sstream>
 #include <map>
@@ -16,6 +17,8 @@
 #include <list>
 #include <functional>
 #include <algorithm>
+#include <unordered_map>
+#include <cstdint>
 
 #ifdef LIQUIBOOK_IGNORES_DEPRECATED_CALLS // TODO CHECK THIS
 #define COMPLAIN_ONCE(message)
@@ -39,190 +42,126 @@ class OrderListener;
 template<class OrderBook>
 class OrderBookListener;
 
-/// @brief The limit order book of a security.  Template implementation allows
-///        user to supply common or smart pointers, and to provide a different
-///        Order class completely (as long as interface is obeyed).
+/// @brief The limit order book of a security.  Orders are held directly (the
+///        order is its own tracker -- it carries open_qty/fill/reserve state),
+///        so there is no separate OrderTracker wrapper.
 template <typename OrderPtr>
 class OrderBook {
 public:
-  using Tracker               = OrderTracker<OrderPtr >                ;
   using TypedCallback         = Callback<OrderPtr >                    ;
   using TypedOrderListener    = OrderListener<OrderPtr >               ;
   using MyClass               = OrderBook<OrderPtr >                   ;
   using TypedTradeListener    = TradeListener<MyClass >                ;
   using TypedOrderBookListener = OrderBookListener<MyClass >           ;
   using Callbacks             = std::vector<TypedCallback >            ;
-  using TrackerMap            = std::multimap<ComparablePrice, Tracker>;
-  using TrackerVec            = std::vector<Tracker>                   ;
+  using OrderMap              = std::multimap<ComparablePrice, OrderPtr>;
+  using OrderVec              = std::vector<OrderPtr>                  ;
   // Keep this around briefly for compatibility.
-  using Bids = TrackerMap;
-  using Asks = TrackerMap;
+  using Bids = OrderMap;
+  using Asks = OrderMap;
 
-  typedef std::list<typename TrackerMap::iterator> DeferredMatches;
+  typedef std::list<typename OrderMap::iterator> DeferredMatches;
 
-  /// @brief construct
   OrderBook(const std::string & symbol = "unknown");
 
-  /// @brief Set symbol for orders in this book.
   void set_symbol(const std::string & symbol);
-
-  /// @ Get the symbol for orders in this book
-  /// @return the symbol.
   const std::string & symbol() const;
 
-  /// @brief set the order listener
   void set_order_listener(TypedOrderListener* listener);
-
-  /// @brief set the trade listener
   void set_trade_listener(TypedTradeListener* listener);
-
-  /// @brief set the order book listener
   void set_order_book_listener(TypedOrderBookListener* listener);
 
-  /// @brief let the application handle reporting errors.
   void set_logger(Logger * logger);
 
-  /// @brief add an order to book
-  /// @param order the order to add
-  /// @param conditions special conditions on the order
-  /// @return true if the add resulted in a fill
   virtual bool add(const OrderPtr& order, OrderConditions conditions = 0);
-
-  /// @brief cancel an order in the book
   virtual void cancel(const OrderPtr& order);
 
-  /// @brief replace an order in the book
-  /// @param order the order to replace
-  /// @param size_delta the change in size for the order (positive or negative)
-  /// @param new_price the new order price, or PRICE_UNCHANGED
-  /// @return true if the replace resulted in a fill
-  virtual bool replace(const OrderPtr& order,
-                       int32_t size_delta = SIZE_UNCHANGED,
-                       Price new_price = PRICE_UNCHANGED);
 
-  /// @brief Set the current market price
-  /// Intended to be used during initialization to establish the market
-  /// price before this order book has generated any exceptions.
-  ///
-  /// If price is zero (or never set) no market-to-market trades can happen.
-  /// @param price is the current market price for this security.
-  void set_market_price(Price price);
+  virtual bool replace(const OrderPtr& order,int32_t size_delta = SIZE_UNCHANGED, uint32_t new_price = PRICE_UNCHANGED);
 
-  /// @brief Get current market price.
-  /// The market price is normally the price at which the last trade happened.
-  Price market_price()const;
 
-  /// @brief access the bids container
-  const TrackerMap& bids() const { return bids_; };
+  void set_market_price(uint32_t price);
+  uint32_t market_price()const;
 
-  /// @brief access the asks container
-  const TrackerMap& asks() const { return asks_; };
+  const OrderMap& bids() const { return bids_; };
+  const OrderMap& asks() const { return asks_; };
+  const OrderMap& stopBids() const { return stopBids_;}
+  const OrderMap& stopAsks() const { return stopAsks_;}
 
-  /// @brief access stop bid orders
-  const TrackerMap& stopBids() const { return stopBids_;}
 
-  /// @brief access stop ask orders
-  const TrackerMap& stopAsks() const { return stopAsks_;}
-
-  /// @brief move callbacks to another thread's container
-  /// @deprecated  This doesn't do anything now
-  /// so don't bother to call it in new code.
   void move_callbacks(Callbacks& target);
-
-  /// @brief perform all callbacks in the queue
-  /// @deprecated  This doesn't do anything now
-  /// so don't bother to call it in new code.
   virtual void perform_callbacks();
 
-  /// @brief log the orders in the book.
   std::ostream & log(std::ostream & out) const;
 
 protected:
-  /// @brief Internal method to process callbacks.
-  /// Protected against recursive calls in case callbacks
-  /// issue new requests.
-  void callback_now();
 
-  /// @brief perform an individual callback
+  void callback_now();
   virtual void perform_callback(TypedCallback& cb);
 
   /// @brief match a new order to current orders
-  /// @param inbound_order the inbound order
+  /// @param inbound the inbound order
   /// @param inbound_price price of the inbound order
   /// @param current_orders open orders
   /// @param[OUT] deferred_aons AON orders from current_orders
   ///             that matched the inbound price,
   ///             but were not filled due to quantity
   /// @return true if a match occurred
-  virtual bool match_order(Tracker& inbound_order,
-    Price inbound_price,
-    TrackerMap& current_orders,
+  virtual bool match_order(OrderPtr& inbound,
+    uint32_t inbound_price,
+    OrderMap& current_orders,
     DeferredMatches & deferred_aons);
 
-  bool match_aon_order(Tracker& inbound,
-    Price inbound_price,
-    TrackerMap& current_orders,
+  bool match_aon_order(OrderPtr& inbound,
+    uint32_t inbound_price,
+    OrderMap& current_orders,
     DeferredMatches & deferred_aons);
 
-  bool match_regular_order(Tracker& inbound,
-    Price inbound_price,
-    TrackerMap& current_orders,
+  bool match_regular_order(OrderPtr& inbound,
+    uint32_t inbound_price,
+    OrderMap& current_orders,
     DeferredMatches & deferred_aons);
 
-  Quantity try_create_deferred_trades(
-    Tracker& inbound,
+  uint32_t try_create_deferred_trades(
+    OrderPtr& inbound,
     DeferredMatches & deferred_matches,
-    Quantity maxQty, // do not exceed
-    Quantity minQty, // must be at least
-    TrackerMap& current_orders);
+    uint32_t maxQty, // do not exceed
+    uint32_t minQty, // must be at least
+    OrderMap& current_orders);
 
   /// @brief see if any deferred All Or None orders can now execute.
   /// @param aons iterators to the orders that might now match
-  /// @param deferredTrackers the container of the aons
-  /// @param marketTrackers the orders to check for matches
+  /// @param deferred_orders the container of the aons
+  /// @param market_orders the orders to check for matches
   bool check_deferred_aons(DeferredMatches & aons,
-    TrackerMap & deferredTrackers,
-    TrackerMap & marketTrackers);
+    OrderMap & deferred_orders,
+    OrderMap & market_orders);
 
   /// @brief perform fill on two orders
-  /// @param inbound_tracker the new (or changed) order tracker
-  /// @param current_tracker the current order tracker
+  /// @param inbound_order the new (or changed) order
+  /// @param current_order the current resting order
   /// @param max_quantity maximum quantity to trade.
   /// @return the number of units traded (zero if unsuccessful).
-  Quantity create_trade(Tracker& inbound_tracker,
-                    Tracker& current_tracker,
-                    Quantity max_quantity = UINT32_MAX);
+  uint32_t create_trade(OrderPtr& inbound_order,
+                    OrderPtr& current_order,
+                    uint32_t max_quantity = UINT32_MAX);
 
   /// @brief find an order in a container
   /// @param order is the the order we are looking for
-  /// @param sideMap contains the container where we will look
   /// @param[OUT] result will point to the entry in the container if we find a match
   /// @returns true: match, false: no match
   bool find_on_market(
     const OrderPtr& order,
-    typename TrackerMap::iterator& result);
+    typename OrderMap::iterator& result);
 
-  /// @brief add incoming stop order to stops colletion unless it's already
-  /// on the market.
   /// @return true if added to stops, false if it should go directly to the order book.
-  bool add_stop_order(Tracker & tracker);
-
+  bool add_stop_order(OrderPtr & order);
   /// @brief See if any stop orders should go on the market.
-  void check_stop_orders(bool side, Price price, TrackerMap & stops);
-
+  void check_stop_orders(bool side, uint32_t price, OrderMap & stops);
   /// @brief accept pending (formerly stop) orders.
   void submit_pending_orders();
 
-  ///////////////////////////////
-  // Callback interfaces as
-  // virtual methods to simplify
-  // derived classes.
-  ///////////////////////////////
-  // Order Listener interface
-  /// @brief callback for an order accept
-  virtual void on_accept(const OrderPtr& order, Quantity quantity){}
-
-  /// @brief callback for an order reject
+  virtual void on_accept(const OrderPtr& order, uint32_t quantity){}
   virtual void on_reject(const OrderPtr& order, const char* reason){}
 
   /// @brief callback for an order fill
@@ -232,61 +171,42 @@ protected:
   /// @param fill_cost the cost of this fill (qty * price)
   virtual void on_fill(const OrderPtr& order,
     const OrderPtr& matched_order,
-    Quantity fill_qty,
-    Cost fill_cost,
+    uint32_t fill_qty,
+    uint32_t fill_cost,
     bool inbound_order_filled,
     bool matched_order_filled){}
 
-  /// @brief callback for an order cancellation
-  virtual void on_cancel(const OrderPtr& order, Quantity quantity){}
 
-  /// @brief callback for an order cancel rejection
+  virtual void on_cancel(const OrderPtr& order, uint32_t quantity){}
   virtual void on_cancel_reject(const OrderPtr& order, const char* reason){}
-
-  /// @brief callback for an order replace
-  /// @param order the replaced order
-  /// @param size_delta the change to order quantity
-  /// @param new_price the updated order price
   virtual void on_replace(const OrderPtr& order,
-    Quantity current_qty,
-    Quantity new_qty,
-    Price new_price){}
-
-  /// @brief callback for an order replace rejection
+    uint32_t current_qty,
+    uint32_t new_qty,
+    uint32_t new_price){}
   virtual void on_replace_reject(const OrderPtr& order, const char* reason){}
-
-  // End of OrderListener Interface
-  ///////////////////////////////
-  // TradeListener Interface
-  /// @brief callback for a trade
-  /// @param book the order book of the fill (not defined whether this is before
-  ///      or after fill)
-  /// @param qty the quantity of this fill
-  /// @param cost the cost of this fill (qty * price)
   virtual void on_trade(const OrderBook* book,
-    Quantity qty,
-    Cost cost){}
-  // End of TradeListener Interface
-  ///////////////////////////////
-  // BookListener Interface
-  /// @brief callback for change anywhere in order book
+    uint32_t qty,
+    uint32_t cost){}
   virtual void on_order_book_change(){}
-  // End of BookListener Interface
-  ///////////////////////////////
-
 
 private:
-    bool submit_order(Tracker & inbound);
-    bool add_order(Tracker& order_tracker, Price order_price);
+    bool submit_order(OrderPtr & inbound);
+    bool add_order(OrderPtr& inbound, uint32_t order_price);
 private:
 
   std::string symbol_;
-  TrackerMap bids_;
-  TrackerMap asks_;
 
-  TrackerMap stopBids_;
-  TrackerMap stopAsks_;
-  TrackerVec pendingOrders_;
+  // O(1) order -> resting location, keyed by order id. Lets cancel/replace/find jump
+  // straight to the order's PIN slot instead of scanning a price level.
+  // Key is uint32_t order id (monotonic, wraps at 2^32); value is the PIN slot location.
+  std::unordered_map<std::uint32_t, order_loc> order_index_;
+
+  OrderMap bids_;
+  OrderMap asks_;
+
+  OrderMap stopBids_;
+  OrderMap stopAsks_;
+  OrderVec pendingOrders_;
 
   Callbacks callbacks_;
   Callbacks workingCallbacks_;
@@ -295,7 +215,7 @@ private:
   TypedTradeListener* trade_listener_;
   TypedOrderBookListener* order_book_listener_;
   Logger * logger_;
-  Price marketPrice_;
+  uint32_t marketPrice_;
 };
 
 template <class OrderPtr>
@@ -335,10 +255,9 @@ OrderBook<OrderPtr>::symbol() const
 }
 
 template <class OrderPtr>
-void
-OrderBook<OrderPtr>:: set_market_price(Price price)
+void OrderBook<OrderPtr>:: set_market_price(uint32_t price)
 {
-  Price oldMarketPrice = marketPrice_;
+  uint32_t oldMarketPrice = marketPrice_;
   marketPrice_ = price;
   if(price > oldMarketPrice || oldMarketPrice == MARKET_ORDER_PRICE)
   {
@@ -357,7 +276,7 @@ OrderBook<OrderPtr>:: set_market_price(Price price)
 /// @brief Get current market price.
 /// The market price is normally the price at which the last trade happened.
 template <class OrderPtr>
-Price
+uint32_t
 OrderBook<OrderPtr>::market_price() const
 {
   return marketPrice_;
@@ -398,8 +317,9 @@ OrderBook<OrderPtr>::add(const OrderPtr& order, OrderConditions conditions)
   {
     size_t accept_cb_index = callbacks_.size();
     callbacks_.push_back(TypedCallback::accept(order));
-    Tracker inbound(order, conditions);
-    if(inbound.ptr()->stop_price() != 0 && add_stop_order(inbound))
+    // The order is its own tracker now; just hold the pointer.
+    OrderPtr inbound = order;
+    if(inbound->stop_price() != 0 && add_stop_order(inbound))
     {
       // The order has been added to stops
     }
@@ -407,10 +327,10 @@ OrderBook<OrderPtr>::add(const OrderPtr& order, OrderConditions conditions)
     {
       matched = submit_order(inbound);
       // Note the filled qty in the accept callback
-      callbacks_[accept_cb_index].quantity = inbound.filled_qty();
+      callbacks_[accept_cb_index].quantity = inbound->filled_qty();
 
       // Cancel any unfilled IOC order
-      if (inbound.immediate_or_cancel() && !inbound.filled())
+      if (inbound->immediate_or_cancel() && !inbound->filled())
       {
         // NOTE - this may need he actual open qty???
         callbacks_.push_back(TypedCallback::cancel(order, 0));
@@ -432,24 +352,31 @@ template <class OrderPtr>
 void
 OrderBook<OrderPtr>::cancel(const OrderPtr& order)
 {
+  /*
+   *
+   *
+   *
+   *  PROBS have to be implemented differnetlyhm 
+   *
+  */
   bool found = false;
-  Quantity open_qty;
+  uint32_t open_qty;
   // If the cancel is a buy order
   if (order->is_buy()) {
-    typename TrackerMap::iterator bid;
+    typename OrderMap::iterator bid;
     find_on_market(order, bid);
     if (bid != bids_.end()) {
-      open_qty = bid->second.open_qty();
+      open_qty = bid->second->open_qty();
       // Remove from container for cancel
       bids_.erase(bid);
       found = true;
     }
   // Else the cancel is a sell order
   } else {
-    typename TrackerMap::iterator ask;
+    typename OrderMap::iterator ask;
     find_on_market(order, ask);
     if (ask != asks_.end()) {
-      open_qty = ask->second.open_qty();
+      open_qty = ask->second->open_qty();
       // Remove from container for cancel
       asks_.erase(ask);
       found = true;
@@ -471,30 +398,30 @@ bool
 OrderBook<OrderPtr>::replace(
   const OrderPtr& order,
   int32_t size_delta,
-  Price new_price)
+  uint32_t new_price)
 {
   bool matched = false;
   bool price_change = new_price && (new_price != order->price());
 
-  Price price = (new_price == PRICE_UNCHANGED) ? order->price() : new_price;
+  uint32_t price = (new_price == PRICE_UNCHANGED) ? order->price() : new_price;
 
   // If the order to replace is a buy order
-  TrackerMap & market = order->is_buy() ? bids_ : asks_;
-  typename TrackerMap::iterator pos;
+  OrderMap & market = order->is_buy() ? bids_ : asks_;
+  typename OrderMap::iterator pos;
   if(find_on_market(order, pos))
   {
     // If this is a valid replace
-    const Tracker& tracker = pos->second;
+    const OrderPtr& resting = pos->second;
     // If there is not enough open quantity for the size reduction
-    if (size_delta < 0 && ((int)tracker.open_qty() < -size_delta))
+    if (size_delta < 0 && ((int)resting->open_qty() < -size_delta))
     {
       // get rid of as much as we can
-      size_delta = -int(tracker.open_qty());
+      size_delta = -int(resting->open_qty());
       if(size_delta == 0)
       {
         // if there is nothing to get rid of
         // Reject the replace
-        callbacks_.push_back(TypedCallback::replace_reject(tracker.ptr(),
+        callbacks_.push_back(TypedCallback::replace_reject(resting,
           "order is already filled"));
         return false;
       }
@@ -502,10 +429,10 @@ OrderBook<OrderPtr>::replace(
 
     // Accept the replace
     callbacks_.push_back(
-        TypedCallback::replace(order, pos->second.open_qty(), size_delta,
+        TypedCallback::replace(order, pos->second->open_qty(), size_delta,
                                 price));
-    Quantity new_open_qty = pos->second.open_qty() + size_delta;
-    pos->second.change_qty(size_delta);  // Update my copy
+    uint32_t new_open_qty = pos->second->open_qty() + size_delta;
+    pos->second->change_qty(size_delta);  // Update the resting order
     // If the size change will close the order
     if (!new_open_qty)
     {
@@ -517,9 +444,9 @@ OrderBook<OrderPtr>::replace(
     {
       // Else rematch the new order - there could be a price change
       // or size change - that could cause all or none match
-      auto order = pos->second;
+      OrderPtr resting_order = pos->second;
       market.erase(pos); // Remove old order order
-      matched = add_order(order, price); // Add order
+      matched = add_order(resting_order, price); // Add order
     }
     // If replace any order this order triggered any trades
     // which triggered any stops
@@ -542,21 +469,21 @@ OrderBook<OrderPtr>::replace(
 
 template <class OrderPtr>
 bool
-OrderBook<OrderPtr>::add_stop_order(Tracker & tracker)
+OrderBook<OrderPtr>::add_stop_order(OrderPtr & order)
 {
-  bool isBuy = tracker.ptr()->is_buy();
-  ComparablePrice key(isBuy, tracker.ptr()->stop_price());
+  bool isBuy = order->is_buy();
+  ComparablePrice key(isBuy, order->stop_price());
   // if the market price is a better deal then the stop price, it's not time to panic
   bool isStopped = key < marketPrice_;
   if(isStopped)
   {
     if(isBuy)
     {
-      stopBids_.emplace(key, std::move(tracker));
+      stopBids_.emplace(key, std::move(order));
     }
     else
     {
-      stopAsks_.emplace(key, std::move(tracker));
+      stopAsks_.emplace(key, std::move(order));
     }
   }
   return isStopped;
@@ -564,8 +491,14 @@ OrderBook<OrderPtr>::add_stop_order(Tracker & tracker)
 
 template <class OrderPtr>
 void
-OrderBook<OrderPtr>::check_stop_orders(bool side, Price price, TrackerMap & stops)
+OrderBook<OrderPtr>::check_stop_orders(bool side, uint32_t price, OrderMap & stops)
 {
+  /*
+   *
+   *  TODO - how to handle this exactly other than just iterate whole map??
+   *
+   *
+  */
   ComparablePrice until(side, price);
   auto pos = stops.begin();
   while(pos != stops.end())
@@ -584,35 +517,44 @@ template <class OrderPtr>
 void
 OrderBook<OrderPtr>::submit_pending_orders()
 {
-  TrackerVec pending;
+  OrderVec pending;
   pending.swap(pendingOrders_);
   for(auto pos = pending.begin(); pos != pending.end(); ++pos)
   {
-    Tracker & tracker = *pos;
-    submit_order(tracker);
+    OrderPtr & order = *pos;
+    submit_order(order);
   }
 }
 
 template <class OrderPtr>
 bool
-OrderBook<OrderPtr>::submit_order(Tracker & inbound)
+OrderBook<OrderPtr>::submit_order(OrderPtr & inbound)
 {
-  Price order_price = inbound.ptr()->price();
+  uint32_t order_price = inbound->price();
   return add_order(inbound, order_price);
 }
 
 template <class OrderPtr>
 bool
 OrderBook<OrderPtr>::find_on_market(
+
+/*
+ *    TODO - this needs big changing, since searching the multimap is way different than searching the narb_Tree
+ *
+ *
+ *
+ *
+ */
+
   const OrderPtr& order,
-  typename TrackerMap::iterator& result)
+  typename OrderMap::iterator& result)
 {
   const ComparablePrice key(order->is_buy(), order->price());
-  TrackerMap & sideMap = order->is_buy() ? bids_ : asks_;
+  OrderMap & sideMap = order->is_buy() ? bids_ : asks_;
 
   for (result = sideMap.find(key); result != sideMap.end(); ++result) {
     // If this is the correct bid
-    if (result->second.ptr() == order)
+    if (result->second == order)
     {
       return true;
     }
@@ -631,10 +573,10 @@ OrderBook<OrderPtr>::find_on_market(
 // add the order to the order book
 template <class OrderPtr>
 bool
-OrderBook<OrderPtr>::add_order(Tracker& inbound, Price order_price)
+OrderBook<OrderPtr>::add_order(OrderPtr& inbound, uint32_t order_price)
 {
   bool matched = false;
-  OrderPtr& order = inbound.ptr();
+  OrderPtr& order = inbound;
   DeferredMatches deferred_aons;
   // Try to match with current orders
   if (order->is_buy()) {
@@ -644,7 +586,7 @@ OrderBook<OrderPtr>::add_order(Tracker& inbound, Price order_price)
   }
 
   // If order has remaining open quantity and is not immediate or cancel
-  if (inbound.open_qty() && !inbound.immediate_or_cancel()) {
+  if (inbound->open_qty() && !inbound->immediate_or_cancel()) {
     // If this is a buy order
     if (order->is_buy())
     {
@@ -673,8 +615,8 @@ OrderBook<OrderPtr>::add_order(Tracker& inbound, Price order_price)
 template <class OrderPtr>
 bool
 OrderBook<OrderPtr>::check_deferred_aons(DeferredMatches & aons,
-  TrackerMap & deferredTrackers,
-  TrackerMap & marketTrackers)
+  OrderMap & deferred_orders,
+  OrderMap & market_orders)
 {
   bool result = false;
   DeferredMatches ignoredAons;
@@ -683,13 +625,13 @@ OrderBook<OrderPtr>::check_deferred_aons(DeferredMatches & aons,
   {
     auto entry = *pos;
     ComparablePrice current_price = entry->first;
-    Tracker & tracker = entry->second;
-    bool matched = match_order(tracker, current_price.price(),
-      marketTrackers, ignoredAons);
+    OrderPtr & order = entry->second;
+    bool matched = match_order(order, current_price.price(),
+      market_orders, ignoredAons);
     result |= matched;
-    if(tracker.filled())
+    if(order->filled())
     {
-      deferredTrackers.erase(entry);
+      deferred_orders.erase(entry);
     }
   }
   return result;
@@ -701,12 +643,12 @@ OrderBook<OrderPtr>::check_deferred_aons(DeferredMatches & aons,
 ///    if any current order is complete, remove from 'current' orders
 template <class OrderPtr>
 bool
-OrderBook<OrderPtr>::match_order(Tracker& inbound,
-  Price inbound_price,
-  TrackerMap& current_orders,
+OrderBook<OrderPtr>::match_order(OrderPtr& inbound,
+  uint32_t inbound_price,
+  OrderMap& current_orders,
   DeferredMatches & deferred_aons)
 {
-  if(inbound.all_or_none())
+  if(inbound->all_or_none())
   {
     return match_aon_order(inbound, inbound_price, current_orders, deferred_aons);
   }
@@ -715,9 +657,9 @@ OrderBook<OrderPtr>::match_order(Tracker& inbound,
 
 template <class OrderPtr>
 bool
-OrderBook<OrderPtr>::match_regular_order(Tracker& inbound,
-  Price inbound_price,
-  TrackerMap& current_orders,
+OrderBook<OrderPtr>::match_regular_order(OrderPtr& inbound,
+  uint32_t inbound_price,
+  OrderMap& current_orders,
   DeferredMatches & deferred_aons)
 {
   // while incoming ! satisfied
@@ -727,9 +669,15 @@ OrderBook<OrderPtr>::match_regular_order(Tracker& inbound,
   //    add AON to deferred
   // loop
   bool matched = false;
-  Quantity inbound_qty = inbound.open_qty();
-  typename TrackerMap::iterator pos = current_orders.begin();
-  while(pos != current_orders.end() && !inbound.filled())
+  uint32_t inbound_qty = inbound->open_qty();
+  typename OrderMap::iterator pos = current_orders.begin();
+  /*
+   *
+   * TODO - improve this matching part
+   *
+   *
+   */
+  while(pos != current_orders.end() && !inbound->filled())
   {
     auto entry = pos++;
     const ComparablePrice & current_price = entry->first;
@@ -741,17 +689,17 @@ OrderBook<OrderPtr>::match_regular_order(Tracker& inbound,
 
     //////////////////////////////////////
     // Current price matches inbound price
-    Tracker & current_order = entry->second;
-    Quantity current_quantity = current_order.open_qty();
+    OrderPtr & current_order = entry->second;
+    uint32_t current_quantity = current_order->open_qty();
 
-    if(current_order.all_or_none())
+    if(current_order->all_or_none())
     {
       // if the inbound order can satisfy the current order's AON condition
       if(current_quantity <= inbound_qty)
       {
         // current is AON, inbound is not AON.
         // inbound can satisfy current's AON
-        Quantity traded = create_trade(inbound, current_order);
+        uint32_t traded = create_trade(inbound, current_order);
         if(traded > 0)
         {
           matched = true;
@@ -770,11 +718,11 @@ OrderBook<OrderPtr>::match_regular_order(Tracker& inbound,
     else
     {
       // neither are AON
-      Quantity traded = create_trade(inbound, current_order);
+      uint32_t traded = create_trade(inbound, current_order);
       if(traded > 0)
       {
         matched = true;
-        if(current_order.filled())
+        if(current_order->filled())
         {
           current_orders.erase(entry);
         }
@@ -787,19 +735,24 @@ OrderBook<OrderPtr>::match_regular_order(Tracker& inbound,
 
 template <class OrderPtr>
 bool
-OrderBook<OrderPtr>::match_aon_order(Tracker& inbound,
-  Price inbound_price,
-  TrackerMap& current_orders,
+OrderBook<OrderPtr>::match_aon_order(OrderPtr& inbound,
+  uint32_t inbound_price,
+  OrderMap& current_orders,
   DeferredMatches & deferred_aons)
 {
   bool matched = false;
-  Quantity inbound_qty = inbound.open_qty();
-  Quantity deferred_qty = 0;
+  uint32_t inbound_qty = inbound->open_qty();
+  uint32_t deferred_qty = 0;
 
   DeferredMatches deferred_matches;
-
-  typename TrackerMap::iterator pos = current_orders.begin();
-  while(pos != current_orders.end() && !inbound.filled())
+  /*
+   *
+   * TODO - improve this matching part
+   *
+   *
+   */
+  typename OrderMap::iterator pos = current_orders.begin();
+  while(pos != current_orders.end() && !inbound->filled())
   {
     auto entry = pos++;
     const ComparablePrice current_price = entry->first;
@@ -811,10 +764,10 @@ OrderBook<OrderPtr>::match_aon_order(Tracker& inbound,
 
     //////////////////////////////////////
     // Current price matches inbound price
-    Tracker & current_order = entry->second;
-    Quantity current_quantity = current_order.open_qty();
+    OrderPtr & current_order = entry->second;
+    uint32_t current_quantity = current_order->open_qty();
 
-    if(current_order.all_or_none())
+    if(current_order->all_or_none())
     {
       // AON::AON
       // if the inbound order can satisfy the current order's AON condition
@@ -827,7 +780,7 @@ OrderBook<OrderPtr>::match_aon_order(Tracker& inbound,
           // Try to create the deferred trades (if any) before creating
           // the trade with the current order.
           // What quantity will we need from the deferred orders?
-          Quantity maxQty = inbound_qty - current_quantity;
+          uint32_t maxQty = inbound_qty - current_quantity;
           if(maxQty == try_create_deferred_trades(
             inbound,
             deferred_matches,
@@ -837,7 +790,7 @@ OrderBook<OrderPtr>::match_aon_order(Tracker& inbound,
           {
             inbound_qty -= maxQty;
             // finally execute this trade
-            Quantity traded = create_trade(inbound, current_order);
+            uint32_t traded = create_trade(inbound, current_order);
             if(traded > 0)
             {
               // assert traded == current_quantity
@@ -868,7 +821,7 @@ OrderBook<OrderPtr>::match_aon_order(Tracker& inbound,
       // if we have enough to satisfy inbound
       if(inbound_qty <= current_quantity + deferred_qty)
       {
-        Quantity traded = try_create_deferred_trades(
+        uint32_t traded = try_create_deferred_trades(
           inbound,
           deferred_matches,
           inbound_qty, // create as many as possible
@@ -882,7 +835,7 @@ OrderBook<OrderPtr>::match_aon_order(Tracker& inbound,
             inbound_qty -= traded;
             matched = true;
           }
-          if(current_order.filled())
+          if(current_order->filled())
           {
             current_orders.erase(entry);
           }
@@ -904,38 +857,38 @@ namespace {
 }
 
 template <class OrderPtr>
-Quantity
+uint32_t
 OrderBook<OrderPtr>::try_create_deferred_trades(
-  Tracker& inbound,
+  OrderPtr& inbound,
   DeferredMatches & deferred_matches,
-  Quantity maxQty, // do not exceed
-  Quantity minQty, // must be at least
-  TrackerMap& current_orders)
+  uint32_t maxQty, // do not exceed
+  uint32_t minQty, // must be at least
+  OrderMap& current_orders)
 {
-  Quantity traded = 0;
+  uint32_t traded = 0;
   // create a vector of proposed trade quantities:
   std::vector<int> fills(deferred_matches.size());
   std::fill(fills.begin(), fills.end(), 0);
-  Quantity foundQty = 0;
+  uint32_t foundQty = 0;
   auto pos = deferred_matches.begin();
   for(size_t index = 0;
     foundQty < maxQty && pos != deferred_matches.end();
     ++index)
   {
     auto entry = *pos++;
-    Tracker & tracker = entry->second;
-    Quantity qty = tracker.open_qty();
+    OrderPtr & order = entry->second;
+    uint32_t qty = order->open_qty();
     // if this would put us over the limit
     if(foundQty + qty > maxQty)
     {
-      if(tracker.all_or_none())
+      if(order->all_or_none())
       {
         qty = 0;
       }
       else
       {
         qty = maxQty - foundQty;
-        // assert qty <= tracker.open_qty();
+        // assert qty <= order->open_qty();
       }
     }
     foundQty += qty;
@@ -951,9 +904,9 @@ OrderBook<OrderPtr>::try_create_deferred_trades(
       ++index)
     {
       auto entry = *pos++;
-      Tracker & tracker = entry->second;
-      traded += create_trade(inbound, tracker, fills[index]);
-      if(tracker.filled())
+      OrderPtr & order = entry->second;
+      traded += create_trade(inbound, order, fills[index]);
+      if(order->filled())
       {
         current_orders.erase(entry);
       }
@@ -963,15 +916,15 @@ OrderBook<OrderPtr>::try_create_deferred_trades(
 }
 
 template <class OrderPtr>
-Quantity
-OrderBook<OrderPtr>::create_trade(Tracker& inbound_tracker,
-                                  Tracker& current_tracker,
-                                  Quantity maxQuantity)
+uint32_t
+OrderBook<OrderPtr>::create_trade(OrderPtr& inbound_order,
+                                  OrderPtr& current_order,
+                                  uint32_t maxQuantity)
 {
-  Price cross_price = current_tracker.ptr()->price();
+  uint32_t cross_price = current_order->price();
   // If current order is a market order, cross at inbound price
   if (MARKET_ORDER_PRICE == cross_price) {
-    cross_price = inbound_tracker.ptr()->price();
+    cross_price = inbound_order->price();
   }
   if(MARKET_ORDER_PRICE == cross_price)
   {
@@ -982,29 +935,32 @@ OrderBook<OrderPtr>::create_trade(Tracker& inbound_tracker,
     // No price available for this order
     return 0;
   }
-  Quantity fill_qty =
+  uint32_t fill_qty =
     (std::min)(maxQuantity,
-    (std::min)(inbound_tracker.open_qty(),
-               current_tracker.open_qty()));
+    (std::min)(inbound_order->open_qty(),
+               current_order->open_qty()));
   if(fill_qty > 0)
   {
-    inbound_tracker.fill(fill_qty);
-    current_tracker.fill(fill_qty);
+    // The order is its own tracker: fill it in place now so the match loop
+    // sees the updated open_qty immediately. (The fill callback no longer fills.)
+    uint32_t fill_cost = fill_qty * cross_price;
+    inbound_order->fill(fill_qty, fill_cost, 0);
+    current_order->fill(fill_qty, fill_cost, 0);
     set_market_price(cross_price);
 
     typename TypedCallback::FillFlags fill_flags =
                                 TypedCallback::ff_neither_filled;
-    if (!inbound_tracker.open_qty()) {
+    if (!inbound_order->open_qty()) {
       fill_flags = (typename TypedCallback::FillFlags)(
                        fill_flags | TypedCallback::ff_inbound_filled);
     }
-    if (!current_tracker.open_qty()) {
+    if (!current_order->open_qty()) {
       fill_flags = (typename TypedCallback::FillFlags)(
                        fill_flags | TypedCallback::ff_matched_filled);
     }
 
-    callbacks_.push_back(TypedCallback::fill(inbound_tracker.ptr(),
-                                             current_tracker.ptr(),
+    callbacks_.push_back(TypedCallback::fill(inbound_order,
+                                             current_order,
                                              fill_qty,
                                              cross_price,
                                              fill_flags));
@@ -1087,7 +1043,7 @@ void OrderBook<OrderPtr>::perform_callback(TypedCallback& cb)
   {
     case TypedCallback::cb_order_fill:
     {
-      Cost fill_cost = cb.price * cb.quantity;
+      uint32_t fill_cost = cb.price * cb.quantity;
       bool inbound_filled = (cb.flags & (TypedCallback::ff_inbound_filled | TypedCallback::ff_both_filled)) != 0;
       bool matched_filled = (cb.flags & (TypedCallback::ff_matched_filled | TypedCallback::ff_both_filled)) != 0;
       on_fill(cb.order, cb.matched_order,
@@ -1174,12 +1130,12 @@ template <class OrderPtr>
 std::ostream & OrderBook<OrderPtr>::log(std::ostream & out) const
 {
   for(auto ask = asks_.rbegin(); ask != asks_.rend(); ++ask) {
-    out << "  Ask " << ask->second.open_qty() << " @ " << ask->first
+    out << "  Ask " << ask->second->open_qty() << " @ " << ask->first
                           << std::endl;
   }
 
   for(auto bid = bids_.begin(); bid != bids_.end(); ++bid) {
-    out << "  Bid " << bid->second.open_qty() << " @ " << bid->first
+    out << "  Bid " << bid->second->open_qty() << " @ " << bid->first
                           << std::endl;
   }
   return out;

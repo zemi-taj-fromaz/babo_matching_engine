@@ -12,13 +12,21 @@
 
 namespace babo {
 
+struct price_level_descriptor;
+
 class pin_node {
 public:
+	pin_node(price_level_descriptor* pld, std::uint16_t capacity) : _pld(pld), cap_(capacity)
+	{
+		slots_.reserve(capacity);
+		links_.reserve(capacity);
+	}
 	static constexpr std::uint16_t npos = static_cast<std::uint16_t>(-1);
 
 	// Methods to be added as needed.
 
 private:
+	price_level_descriptor* _pld;
 	struct link {
 		std::uint16_t prev{npos};
 		std::uint16_t next{npos};

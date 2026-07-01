@@ -7,16 +7,16 @@
 #include "simple/simple_order.h"
 
 #include <iostream>
+#include <stdexcept>
 
 namespace babo::simple {
 
-uint32_t SimpleOrder::last_order_id_(0);
 
 SimpleOrder::SimpleOrder(
   bool is_buy,
-  book::Price price,
-  book::Quantity qty,
-  book::Price stop_price,
+  uint32_t price,
+  uint32_t qty,
+  uint32_t stop_price,
   book::OrderConditions conditions)
 : state_(os_new),
   is_buy_(is_buy),
@@ -26,6 +26,7 @@ SimpleOrder::SimpleOrder(
   conditions_(conditions),
   filled_qty_(0),
   filled_cost_(0),
+  reserved_(0),
   order_id_(++last_order_id_)
 {
 }
@@ -42,13 +43,13 @@ SimpleOrder::is_buy() const
   return is_buy_;
 }
 
-book::Price
+uint32_t
 SimpleOrder::price() const
 {
   return price_;
 }
 
-book::Price
+uint32_t
 SimpleOrder::stop_price() const
 {
   return stop_price_;
@@ -71,40 +72,68 @@ SimpleOrder::immediate_or_cancel() const
 {
   return (conditions_ & book::OrderCondition::oc_immediate_or_cancel) != 0;
 }
-book::Quantity
+uint32_t
 SimpleOrder::order_qty() const
 {
   return order_qty_;
 }
 
-book::Quantity
+uint32_t
 SimpleOrder::open_qty() const
 {
+  // Remaining quantity, minus any tentatively reserved amount.
   // If not completely filled, calculate
   if (filled_qty_ < order_qty_) {
-    return order_qty_ - filled_qty_;
+    uint32_t remaining = order_qty_ - filled_qty_;
+    // Subtract the reservation, guarding against going below zero.
+    if (reserved_ > 0 && static_cast<uint32_t>(reserved_) < remaining) {
+      return remaining - static_cast<uint32_t>(reserved_);
+    }
+    return (reserved_ <= 0) ? remaining : 0;
   // Else prevent accidental overflow
   } else {
     return 0;
   }
 }
 
-const book::Quantity&
+uint32_t
+SimpleOrder::reserve(int32_t reserved)
+{
+  reserved_ += reserved;
+  return open_qty();
+}
+
+bool
+SimpleOrder::filled() const
+{
+  return filled_qty_ >= order_qty_;
+}
+
+void
+SimpleOrder::change_qty(int32_t delta)
+{
+  if (delta < 0 && static_cast<int32_t>(open_qty()) < -delta) {
+    throw std::runtime_error("Replace size reduction larger than open quantity");
+  }
+  order_qty_ += delta;
+}
+
+const uint32_t&
 SimpleOrder::filled_qty() const
 {
   return filled_qty_;
 }
 
-const book::Cost&
+const uint32_t&
 SimpleOrder::filled_cost() const
 {
   return filled_cost_;
 }
 
 void
-SimpleOrder::fill(book::Quantity fill_qty,
-                  book::Cost fill_cost,
-                  book::FillId /*fill_id*/)
+SimpleOrder::fill(uint32_t fill_qty,
+                  uint32_t fill_cost,
+                  uint32_t /*fill_id*/)
 {
   filled_qty_ += fill_qty;
   filled_cost_ += fill_cost;
@@ -130,7 +159,7 @@ SimpleOrder::cancel()
 }
 
 void
-SimpleOrder::replace(book::Quantity size_delta, book::Price new_price)
+SimpleOrder::replace(uint32_t size_delta, uint32_t new_price)
 {
   if (os_accepted == state_) {
     order_qty_ += size_delta;

@@ -18,64 +18,64 @@ public:
   DepthLevel& operator=(const DepthLevel& rhs);
 
   /// @brief get price
-  const Price& price() const;
+  const uint32_t& price() const;
   /// @brief get count
   uint32_t order_count() const;
   /// @brief get aggregate quantity
-  Quantity aggregate_qty() const;
+  uint32_t aggregate_qty() const;
   /// @brief is this level part of the excess
   bool is_excess() const { return is_excess_; }
 
-  void init(Price price, bool is_excess);
+  void init(uint32_t price, bool is_excess);
 
   /// @brief add an order to the level
   /// @param qty open quantity of the order
-  void add_order(Quantity qty);
+  void add_order(uint32_t qty);
 
   /// @brief increase the quantity of existing orders
   /// @param qty amount to increase the quantity by
-  void increase_qty(Quantity qty);
+  void increase_qty(uint32_t qty);
 
   /// @brief decrease the quantity of existing orders
   /// @param qty amount to decrease the quantity by
-  void decrease_qty(Quantity qty);
+  void decrease_qty(uint32_t qty);
 
   /// @brief overwrite all values of the level
   /// @param price the level price
   /// @param qty the aggegate quantity
   /// @param order_count the number of orders
   /// @param last_change the last change ID (optional)
-  void set(Price price,
-           Quantity qty,
+  void set(uint32_t price,
+           uint32_t qty,
            uint32_t order_count,
-           ChangeId last_change = 0);
+           uint32_t last_change = 0);
 
   /// @brief cancel or fill an order, decrease count and quantity
   /// @param qty the closed quantity
   /// @return true if the level is now empty
-  bool close_order(Quantity qty);
+  bool close_order(uint32_t qty);
 
   /// @brief set last changed stamp on this level
-  void last_change(ChangeId last_change) { last_change_ = last_change; }
+  void last_change(uint32_t last_change) { last_change_ = last_change; }
 
   /// @brief get last change stamp for this level
-  ChangeId last_change() const { return last_change_; }
+  uint32_t last_change() const { return last_change_; }
 
   /// @brief has the level changed since the given stamp?
   /// @param last_published_change the stamp to compare to
-  bool changed_since(ChangeId last_published_change) const;
+  bool changed_since(uint32_t last_published_change) const;
 
 private:
-  Price price_;
+  uint32_t price_;
   uint32_t order_count_;
-  Quantity aggregate_qty_;
+  uint32_t aggregate_qty_;
   bool is_excess_;
 public:
-  ChangeId last_change_;
+  uint32_t last_change_;
 };
 
 inline bool
-DepthLevel::changed_since(ChangeId last_published_change) const
+DepthLevel::changed_since(uint32_t last_published_change) const
 {
   return last_change_ > last_published_change;
 }
@@ -103,7 +103,7 @@ DepthLevel& DepthLevel::operator=(const DepthLevel& rhs)
 }
 
 inline
-const Price&
+const uint32_t&
 DepthLevel::price() const
 {
   return price_;
@@ -111,7 +111,7 @@ DepthLevel::price() const
 
 inline
 void
-DepthLevel::init(Price price, bool is_excess)
+DepthLevel::init(uint32_t price, bool is_excess)
 {
   price_ = price;
   order_count_ = 0;
@@ -127,7 +127,7 @@ DepthLevel::order_count() const
 }
 
 inline
-Quantity
+uint32_t
 DepthLevel::aggregate_qty() const
 {
   return aggregate_qty_;
@@ -135,7 +135,7 @@ DepthLevel::aggregate_qty() const
 
 inline
 void
-DepthLevel::add_order(Quantity qty)
+DepthLevel::add_order(uint32_t qty)
 {
   // Increment/increase
   ++order_count_;
@@ -144,7 +144,7 @@ DepthLevel::add_order(Quantity qty)
 
 inline
 bool
-DepthLevel::close_order(Quantity qty)
+DepthLevel::close_order(uint32_t qty)
 {
   bool empty = false;
   // If this is the last order, reset the level
@@ -170,10 +170,10 @@ DepthLevel::close_order(Quantity qty)
 
 inline
 void
-DepthLevel::set(Price price,
-  Quantity qty,
+DepthLevel::set(uint32_t price,
+  uint32_t qty,
   uint32_t order_count,
-  ChangeId last_change)
+  uint32_t last_change)
 {
   price_ = price;
   aggregate_qty_ = qty;
@@ -183,14 +183,14 @@ DepthLevel::set(Price price,
 
 inline
 void
-DepthLevel::increase_qty(Quantity qty)
+DepthLevel::increase_qty(uint32_t qty)
 {
   aggregate_qty_ += qty;
 }
 
 inline
 void
-DepthLevel::decrease_qty(Quantity qty)
+DepthLevel::decrease_qty(uint32_t qty)
 {
   aggregate_qty_ -= qty;
 }

@@ -18,16 +18,16 @@ public:
 
   /// @brief fill an order
   /// @param qty the number of shares filled in this fill
-  void fill(Quantity qty);
+  void fill(uint32_t qty);
 
   /// @brief is there no remaining open quantity in this order?
   bool filled() const;
 
   /// @brief get the total filled quantity of this order
-  Quantity filled_qty() const;
+  uint32_t filled_qty() const;
 
   /// @brief get the open quantity of this order
-  Quantity open_qty() const;
+  uint32_t open_qty() const;
 
   /// @brief get the order pointer
   const OrderPtr& ptr() const;
@@ -41,11 +41,11 @@ public:
   /// @ brief is this order marked immediate or cancel?
   bool immediate_or_cancel() const;
 
-  Quantity reserve(int32_t reserved);
+  uint32_t reserve(int32_t reserved);
 
 private:
   OrderPtr order_;
-  Quantity open_qty_;
+  uint32_t open_qty_;
   int32_t reserved_;
   OrderConditions conditions_;
 };
@@ -72,7 +72,7 @@ OrderTracker<OrderPtr>::OrderTracker(
 }
 
 template <class OrderPtr>
-Quantity OrderTracker<OrderPtr>::reserve(int32_t reserved)
+uint32_t OrderTracker<OrderPtr>::reserve(int32_t reserved)
 {
   reserved_ += reserved;
   return open_qty_  - reserved_;
@@ -88,7 +88,7 @@ void OrderTracker<OrderPtr>::change_qty(int32_t delta)
 }
 
 template <class OrderPtr>
-void OrderTracker<OrderPtr>::fill(Quantity qty)
+void OrderTracker<OrderPtr>::fill(uint32_t qty)
 {
   if (qty > open_qty_) {
     throw std::runtime_error("Fill size larger than open quantity");
@@ -103,7 +103,7 @@ bool OrderTracker<OrderPtr>::filled() const
 }
 
 template <class OrderPtr>
-Quantity OrderTracker<OrderPtr>::filled_qty() const
+uint32_t OrderTracker<OrderPtr>::filled_qty() const
 {
   return order_->order_qty() - open_qty();
 }
@@ -112,7 +112,7 @@ Quantity OrderTracker<OrderPtr>::filled_qty() const
 // system to use that, then provide a method to get to the open
 // quantity without considering reserved
 template <class OrderPtr>
-Quantity OrderTracker<OrderPtr>::open_qty() const
+uint32_t OrderTracker<OrderPtr>::open_qty() const
 {
   return open_qty_ - reserved_;
 }

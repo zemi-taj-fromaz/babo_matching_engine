@@ -8,12 +8,6 @@
 #include <cstdint>
 
 namespace babo::book {
-// Types used in Liquibook
-using  Cost            = uint32_t;
-using  Price           = uint32_t;
-using  Quantity        = uint32_t;
-using  FillId          = uint32_t;
-using  ChangeId        = uint32_t;
 using  OrderConditions = uint32_t;
 
 enum class OrderCondition : uint32_t {
@@ -24,8 +18,8 @@ enum class OrderCondition : uint32_t {
   oc_stop = oc_immediate_or_cancel << 1
 };
 
-inline constexpr Price MARKET_ORDER_PRICE{0};
-inline constexpr Price PRICE_UNCHANGED{0};
+inline constexpr uint32_t MARKET_ORDER_PRICE{0};
+inline constexpr uint32_t PRICE_UNCHANGED{0};
 inline constexpr int32_t SIZE_UNCHANGED{0};
 
 }

@@ -15,14 +15,14 @@ public:
     virtual bool is_buy() const = 0;
 
     /// @brief get the price of this order, or 0 if a market order
-    virtual Price price() const = 0;
+    virtual uint32_t price() const = 0;
 
     /// @brief get the stop price (if any) for this order.
     /// @returns the stop price or zero if not a stop order
-    virtual Price stop_price() const;
+    virtual uint32_t stop_price() const;
 
     /// @brief get the quantity of this order
-    virtual Quantity order_qty() const = 0;
+    virtual uint32_t order_qty() const = 0;
 
     /// @brief if no trades should happen until the order
     /// can be filled completely.
@@ -39,7 +39,7 @@ inline bool Order::is_limit() const
     return (price() > 0);
 }
 
-inline Price Order::stop_price() const
+inline uint32_t Order::stop_price() const
 {
     // default to not a stop order
     return 0;

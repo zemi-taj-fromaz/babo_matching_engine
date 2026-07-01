@@ -72,20 +72,20 @@ public:
   /// @brief create a new fill callback
   static Callback<OrderPtr> fill(const OrderPtr& inbound_order,
                                  const OrderPtr& matched_order,
-                                 const Quantity& fill_qty,
-                                 const Price& fill_price,
+                                 const uint32_t& fill_qty,
+                                 const uint32_t& fill_price,
                                  FillFlags fill_flags);
   /// @brief create a new cancel callback
   static Callback<OrderPtr> cancel(const OrderPtr& order,
-                                   const Quantity& open_qty);
+                                   const uint32_t& open_qty);
   /// @brief create a new cancel reject callback
   static Callback<OrderPtr> cancel_reject(const OrderPtr& order,
                                           const char* reason);
   /// @brief create a new replace callback
   static Callback<OrderPtr> replace(const OrderPtr& order,
-                                    const Quantity& curr_open_qty,
+                                    const uint32_t& curr_open_qty,
                                     const int32_t& size_delta,
-                                    const Price& new_price);
+                                    const uint32_t& new_price);
   /// @brief create a new replace reject callback
   static Callback<OrderPtr> replace_reject(const OrderPtr& order,
                                            const char* reason);
@@ -94,8 +94,8 @@ public:
   CbType type;
   OrderPtr order;
   OrderPtr matched_order;
-  Quantity quantity;
-  Price price;
+  uint32_t quantity;
+  uint32_t price;
   uint8_t flags;
   int32_t delta;
   const char* reject_reason;
@@ -140,8 +140,8 @@ template <class OrderPtr>
 Callback<OrderPtr> Callback<OrderPtr>::fill(
   const OrderPtr& inbound_order,
   const OrderPtr& matched_order,
-  const Quantity& fill_qty,
-  const Price& fill_price,
+  const uint32_t& fill_qty,
+  const uint32_t& fill_price,
   FillFlags fill_flags)
 {
   Callback<OrderPtr> result;
@@ -157,7 +157,7 @@ Callback<OrderPtr> Callback<OrderPtr>::fill(
 template <class OrderPtr>
 Callback<OrderPtr> Callback<OrderPtr>::cancel(
   const OrderPtr& order,
-  const Quantity& open_qty)
+  const uint32_t& open_qty)
 {
   // TODO save the open qty
   Callback<OrderPtr> result;
@@ -182,9 +182,9 @@ Callback<OrderPtr> Callback<OrderPtr>::cancel_reject(
 template <class OrderPtr>
 Callback<OrderPtr> Callback<OrderPtr>::replace(
   const OrderPtr& order,
-  const Quantity& curr_open_qty,
+  const uint32_t& curr_open_qty,
   const int32_t& size_delta,
-  const Price& new_price)
+  const uint32_t& new_price)
 {
   // TODO save the order open qty
   Callback<OrderPtr> result;

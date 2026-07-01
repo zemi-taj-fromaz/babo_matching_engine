@@ -13,7 +13,7 @@ namespace babo  {
 struct order_loc
 {
     pin_node* pin_loc;
-    uint32_t index;
+    uint16_t index;   // slot index within pin_loc; matches pin_node's uint16_t slot addressing
 };
 
 enum class color : uint8_t {RED, BLACK};

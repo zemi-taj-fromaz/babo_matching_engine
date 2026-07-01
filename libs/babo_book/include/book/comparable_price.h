@@ -25,14 +25,14 @@ namespace babo::book {
 ///
 class ComparablePrice
 {
-  Price price_;
+  uint32_t price_;
   bool buySide_;
 
 public:
   /// @brief construct given side and price
   /// @param buySide controls whether price comparison is normal or reversed
   /// @param price is the price for this key, or 0 (MARKET_ORDER_PRICE) for market
-  ComparablePrice(bool buySide, Price price)
+  ComparablePrice(bool buySide, uint32_t price)
     : price_(price)
     , buySide_(buySide)
   {
@@ -40,7 +40,7 @@ public:
 
   /// @brief Check possible trade
   /// Assumes rhs is on the opposite side
-  bool matches(Price rhs) const
+  bool matches(uint32_t rhs) const
   {
     if(price_ == rhs)
     {
@@ -57,7 +57,7 @@ public:
   /// Side determines the sense of the comparison; the market price (0) is the most
   /// liquid and always orders first. weak_ordering because equivalent keys are not
   /// substitutable (equality ignores side).
-  std::weak_ordering operator <=>(Price rhs) const
+  std::weak_ordering operator <=>(uint32_t rhs) const
   {
     if(price_ == rhs)                return std::weak_ordering::equivalent; // includes market == market
     if(price_ == MARKET_ORDER_PRICE) return std::weak_ordering::less;       // market matches any counter -> first
@@ -67,7 +67,7 @@ public:
   }
 
   /// @brief equality compare key to a price (without regard to side)
-  bool operator ==(Price rhs) const
+  bool operator ==(uint32_t rhs) const
   {
     return price_ == rhs;
   }
@@ -85,7 +85,7 @@ public:
   }
 
   /// @brief access price.
-  Price price() const
+  uint32_t price() const
   {
     return price_;
   }
@@ -103,7 +103,7 @@ public:
   }
 };
 
-// Reversed forms such as (Price < ComparablePrice) are synthesized by the compiler
+// Reversed forms such as (uint32_t < ComparablePrice) are synthesized by the compiler
 // from the member operator<=> / operator== above, so no hand-written free operators are needed.
 
 inline std::ostream & operator << (std::ostream & out, const ComparablePrice & key)

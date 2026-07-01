@@ -40,21 +40,21 @@ public:
   //////////////////////////////////
   // Implement virtual callback methods
   // needed to maintain depth book.
-  virtual void on_accept(const OrderPtr& order, Quantity quantity);
+  virtual void on_accept(const OrderPtr& order, uint32_t quantity);
 
   virtual void on_fill(const OrderPtr& order,
     const OrderPtr& matched_order,
-    Quantity fill_qty,
-    Cost fill_cost,
+    uint32_t fill_qty,
+    uint32_t fill_cost,
     bool inbound_order_filled,
     bool matched_order_filled);
 
-  virtual void on_cancel(const OrderPtr& order, Quantity quantity);
+  virtual void on_cancel(const OrderPtr& order, uint32_t quantity);
 
   virtual void on_replace(const OrderPtr& order,
-    Quantity current_qty,
-    Quantity new_qty,
-    Price new_price);
+    uint32_t current_qty,
+    uint32_t new_qty,
+    uint32_t new_price);
 
   virtual void on_order_book_change();
 
@@ -88,7 +88,7 @@ DepthOrderBook<OrderPtr, SIZE>::set_depth_listener(TypedDepthListener* listener)
 
 template <class OrderPtr, int SIZE>
 void
-DepthOrderBook<OrderPtr, SIZE>::on_accept(const OrderPtr& order, Quantity quantity)
+DepthOrderBook<OrderPtr, SIZE>::on_accept(const OrderPtr& order, uint32_t quantity)
 {
   // If the order is a limit order
   if (order->is_limit())
@@ -115,8 +115,8 @@ template <class OrderPtr, int SIZE>
 void
 DepthOrderBook<OrderPtr, SIZE>::on_fill(const OrderPtr& order,
   const OrderPtr& matched_order,
-  Quantity quantity,
-  Cost fill_cost,
+  uint32_t quantity,
+  uint32_t fill_cost,
   bool inbound_order_filled,
   bool matched_order_filled)
 {
@@ -140,7 +140,7 @@ DepthOrderBook<OrderPtr, SIZE>::on_fill(const OrderPtr& order,
 
 template <class OrderPtr, int SIZE>
 void
-DepthOrderBook<OrderPtr, SIZE>::on_cancel(const OrderPtr& order, Quantity quantity)
+DepthOrderBook<OrderPtr, SIZE>::on_cancel(const OrderPtr& order, uint32_t quantity)
 {
   // If the order is a limit order
   if (order->is_limit()) {
@@ -154,9 +154,9 @@ DepthOrderBook<OrderPtr, SIZE>::on_cancel(const OrderPtr& order, Quantity quanti
 template <class OrderPtr, int SIZE>
 void
 DepthOrderBook<OrderPtr, SIZE>::on_replace(const OrderPtr& order,
-  Quantity current_qty,
-  Quantity new_qty,
-  Price new_price)
+  uint32_t current_qty,
+  uint32_t new_qty,
+  uint32_t new_price)
 {
   // Notify the depth
   depth_.replace_order(order->price(), new_price,
@@ -173,7 +173,7 @@ DepthOrderBook<OrderPtr, SIZE>::on_order_book_change()
       depth_listener_->on_depth_change(this, &depth_);
     }
     if (bbo_listener_) {
-      ChangeId last_change = depth_.last_published_change();
+      uint32_t last_change = depth_.last_published_change();
       // May have been the first level which changed
       if ((depth_.bids()->changed_since(last_change)) ||
         (depth_.asks()->changed_since(last_change))) {

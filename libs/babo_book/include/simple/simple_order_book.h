@@ -13,14 +13,14 @@ template <int SIZE = 5>
 class SimpleOrderBook : public book::DepthOrderBook<SimpleOrder*, SIZE> {
 public:
   typedef book::Callback<SimpleOrder*> SimpleCallback;
-  typedef uint32_t FillId;
+  typedef uint32_t uint32_t;
 
   SimpleOrderBook();
 
   // Override callback handling to update SimpleOrder state
   virtual void perform_callback(SimpleCallback& cb);
 private:
-  FillId fill_id_;
+  uint32_t fill_id_;
 };
 
 template <int SIZE>
@@ -39,12 +39,10 @@ SimpleOrderBook<SIZE>::perform_callback(SimpleCallback& cb)
     cb.order->accept();
     break;
   case SimpleCallback::cb_order_fill: {
-    // Increment fill ID once
+    // Increment fill ID once.
     ++fill_id_;
-    // Update the orders
-    book::Cost fill_cost = cb.quantity * cb.price;
-    cb.matched_order->fill(cb.quantity, fill_cost, fill_id_);
-    cb.order->fill(cb.quantity, fill_cost, fill_id_);
+    // NOTE: orders are now filled in place during matching (create_trade),
+    // since the order is its own tracker. Filling again here would double-count.
     break;
   }
   case SimpleCallback::cb_order_cancel:

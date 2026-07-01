@@ -51,21 +51,21 @@ public:
   /// @param price the price level of the order
   /// @param qty the open quantity of the order
   /// @param is_bid indicator of bid or ask
-  void add_order(Price price, Quantity qty, bool is_bid);
+  void add_order(uint32_t price, uint32_t qty, bool is_bid);
 
   /// @brief ignore future fill quantity on a side, due to a match at
   ///        accept time for an order
   /// @param qty the open quantity to ignore
   /// @param is_bid indicator of bid or ask
-  void ignore_fill_qty(Quantity qty, bool is_bid);
+  void ignore_fill_qty(uint32_t qty, bool is_bid);
 
   /// @brief handle an order fill
   /// @param price the price level of the order
   /// @param fill_qty the quantity of this fill
   /// @param filled was this order completely filled?
   /// @param is_bid indicator of bid or ask
-  void fill_order(Price price,
-                  Quantity fill_qty,
+  void fill_order(uint32_t price,
+                  uint32_t fill_qty,
                   bool filled,
                   bool is_bid);
   /// @brief cancel or fill an order
@@ -73,13 +73,13 @@ public:
   /// @param open_qty the open quantity of the order
   /// @param is_bid indicator of bid or ask
   /// @return true if the close erased a visible level
-  bool close_order(Price price, Quantity open_qty, bool is_bid);
+  bool close_order(uint32_t price, uint32_t open_qty, bool is_bid);
 
   /// @brief change quantity of an order
   /// @param price the price level of the order
   /// @param qty_delta the change in open quantity of the order (+ or -)
   /// @param is_bid indicator of bid or ask
-  void change_qty_order(Price price, int32_t qty_delta, bool is_bid);
+  void change_qty_order(uint32_t price, int32_t qty_delta, bool is_bid);
 
   /// @brief replace a order
   /// @param current_price the current price level of the order
@@ -88,43 +88,43 @@ public:
   /// @param new_qty the new open quantity of the order
   /// @param is_bid indicator of bid or ask
   /// @return true if the close erased a visible level
-  bool replace_order(Price current_price,
-                     Price new_price,
-                     Quantity current_qty,
-                     Quantity new_qty,
+  bool replace_order(uint32_t current_price,
+                     uint32_t new_price,
+                     uint32_t current_qty,
+                     uint32_t new_qty,
                      bool is_bid);
 
   /// @brief does this depth need bid restoration after level erasure
   /// @param restoration_price the price to restore after (out)
   /// @return true if restoration is needed (previously was full)
-  bool needs_bid_restoration(Price& restoration_price);
+  bool needs_bid_restoration(uint32_t& restoration_price);
 
   /// @brief does this depth need ask restoration after level erasure
   /// @param restoration_price the price to restore after (out)
   /// @return true if restoration is needed (previously was full)
-  bool needs_ask_restoration(Price& restoration_price);
+  bool needs_ask_restoration(uint32_t& restoration_price);
 
   /// @brief has the depth changed since the last publish
   bool changed() const;
 
   /// @brief what was the ID of the last change?
-  ChangeId last_change() const;
+  uint32_t last_change() const;
 
   /// @brief what was the ID of the last published change?
-  ChangeId last_published_change() const;
+  uint32_t last_published_change() const;
 
   /// @brief note the ID of last published change
   void published();
 
 private:
   DepthLevel levels_[SIZE*2];
-  ChangeId last_change_;
-  ChangeId last_published_change_;
-  Quantity ignore_bid_fill_qty_;
-  Quantity ignore_ask_fill_qty_;
+  uint32_t last_change_;
+  uint32_t last_published_change_;
+  uint32_t ignore_bid_fill_qty_;
+  uint32_t ignore_ask_fill_qty_;
 
-  typedef std::map<Price, DepthLevel, std::greater<Price> > BidLevelMap;
-  typedef std::map<Price, DepthLevel, std::less<Price> > AskLevelMap;
+  typedef std::map<uint32_t, DepthLevel, std::greater<uint32_t> > BidLevelMap;
+  typedef std::map<uint32_t, DepthLevel, std::less<uint32_t> > AskLevelMap;
   BidLevelMap excess_bid_levels_;
   AskLevelMap excess_ask_levels_;
 
@@ -133,7 +133,7 @@ private:
   /// @param is_bid indicator of bid or ask
   /// @param should_create should a level for the price be created, if necessary
   /// @return the level, or nullptr if not found and full
-  DepthLevel* find_level(Price price, bool is_bid, bool should_create = true);
+  DepthLevel* find_level(uint32_t price, bool is_bid, bool should_create = true);
 
   /// @brief insert a new level before this level and shift down
   /// @param level the level to insert before
@@ -141,7 +141,7 @@ private:
   /// @param price the price to initialize the level at
   void insert_level_before(DepthLevel* level,
                            bool is_bid,
-                           Price price);
+                           uint32_t price);
 
   /// @brief erase a level and shift up
   /// @param level the level to erase
@@ -224,9 +224,9 @@ Depth<SIZE>::last_ask_level()
 
 template <int SIZE>
 inline void
-Depth<SIZE>::add_order(Price price, Quantity qty, bool is_bid)
+Depth<SIZE>::add_order(uint32_t price, uint32_t qty, bool is_bid)
 {
-  ChangeId last_change_copy = last_change_;
+  uint32_t last_change_copy = last_change_;
   DepthLevel* level = find_level(price, is_bid);
   if (level) {
     level->add_order(qty);
@@ -242,7 +242,7 @@ Depth<SIZE>::add_order(Price price, Quantity qty, bool is_bid)
 
 template <int SIZE>
 inline void
-Depth<SIZE>::ignore_fill_qty(Quantity qty, bool is_bid)
+Depth<SIZE>::ignore_fill_qty(uint32_t qty, bool is_bid)
 {
   if (is_bid) {
     if (ignore_bid_fill_qty_) {
@@ -260,8 +260,8 @@ Depth<SIZE>::ignore_fill_qty(Quantity qty, bool is_bid)
 template <int SIZE>
 inline void
 Depth<SIZE>::fill_order(
-  Price price,
-  Quantity fill_qty,
+  uint32_t price,
+  uint32_t fill_qty,
   bool filled,
   bool is_bid)
 {
@@ -278,7 +278,7 @@ Depth<SIZE>::fill_order(
 
 template <int SIZE>
 inline bool
-Depth<SIZE>::close_order(Price price, Quantity open_qty, bool is_bid)
+Depth<SIZE>::close_order(uint32_t price, uint32_t open_qty, bool is_bid)
 {
   DepthLevel* level = find_level(price, is_bid, false);
   if (level) {
@@ -296,14 +296,14 @@ Depth<SIZE>::close_order(Price price, Quantity open_qty, bool is_bid)
 
 template <int SIZE>
 inline void
-Depth<SIZE>::change_qty_order(Price price, int32_t qty_delta, bool is_bid)
+Depth<SIZE>::change_qty_order(uint32_t price, int32_t qty_delta, bool is_bid)
 {
   DepthLevel* level = find_level(price, is_bid, false);
   if (level && qty_delta) {
     if (qty_delta > 0) {
-      level->increase_qty(Quantity(qty_delta));
+      level->increase_qty(uint32_t(qty_delta));
     } else {
-      level->decrease_qty(Quantity(std::abs(qty_delta)));
+      level->decrease_qty(uint32_t(std::abs(qty_delta)));
     }
     level->last_change(++last_change_);
   }
@@ -313,10 +313,10 @@ Depth<SIZE>::change_qty_order(Price price, int32_t qty_delta, bool is_bid)
 template <int SIZE>
 inline bool
 Depth<SIZE>::replace_order(
-  Price current_price,
-  Price new_price,
-  Quantity current_qty,
-  Quantity new_qty,
+  uint32_t current_price,
+  uint32_t new_price,
+  uint32_t current_qty,
+  uint32_t new_qty,
   bool is_bid)
 {
   bool erased = false;
@@ -338,7 +338,7 @@ Depth<SIZE>::replace_order(
 
 template <int SIZE>
 inline bool
-Depth<SIZE>::needs_bid_restoration(Price& restoration_price)
+Depth<SIZE>::needs_bid_restoration(uint32_t& restoration_price)
 {
   // If this depth has multiple levels
   if (SIZE > 1) {
@@ -359,7 +359,7 @@ Depth<SIZE>::needs_bid_restoration(Price& restoration_price)
 
 template <int SIZE>
 inline bool
-Depth<SIZE>::needs_ask_restoration(Price& restoration_price)
+Depth<SIZE>::needs_ask_restoration(uint32_t& restoration_price)
 {
   // If this depth has multiple levels
   if (SIZE > 1) {
@@ -380,7 +380,7 @@ Depth<SIZE>::needs_ask_restoration(Price& restoration_price)
 
 template <int SIZE>
 DepthLevel*
-Depth<SIZE>::find_level(Price price, bool is_bid, bool should_create)
+Depth<SIZE>::find_level(uint32_t price, bool is_bid, bool should_create)
 {
   // Find starting and ending point
   DepthLevel* level = is_bid ? bids() : asks();
@@ -446,7 +446,7 @@ template <int SIZE>
 void
 Depth<SIZE>::insert_level_before(DepthLevel* level,
                                  bool is_bid,
-                                 Price price)
+                                 uint32_t price)
 {
   DepthLevel* last_side_level = is_bid ? last_bid_level() : last_ask_level();
 
@@ -554,14 +554,14 @@ Depth<SIZE>::changed() const
 
 
 template <int SIZE>
-ChangeId
+uint32_t
 Depth<SIZE>::last_change() const
 {
   return last_change_;
 }
 
 template <int SIZE>
-ChangeId
+uint32_t
 Depth<SIZE>::last_published_change() const
 {
   return last_published_change_;

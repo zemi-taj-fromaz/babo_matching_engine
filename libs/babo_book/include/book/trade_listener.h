@@ -17,8 +17,8 @@ public:
   /// @param qty the quantity of this fill
   /// @param cost the cost of this fill (qty * price)
   virtual void on_trade(const OrderBook* book,
-                        Quantity qty,
-                        Cost cost) = 0;
+                        uint32_t qty,
+                        uint32_t cost) = 0;
 };
 
 }

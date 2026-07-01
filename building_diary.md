@@ -67,4 +67,6 @@ TODO - insert u narb_tree provjerava prvo od min/max pa do nekog level pred/succ
 
 TODO - start with fixed capacity and move on to flexibile capacity after that
 
-TODO - allocation pool for PINs?
+TODO - allocation pool for PINs? (in pin_node.h instead of vector use arena)
+
+TODO -> write down rules for pre-decrement and post-decrement as well 
