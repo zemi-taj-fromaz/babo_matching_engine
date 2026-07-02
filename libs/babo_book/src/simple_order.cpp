@@ -186,4 +186,13 @@ SimpleOrder::replace(uint32_t size_delta, uint32_t new_price)
   }
 }
 
+void
+SimpleOrder::modify(int32_t size_delta, uint64_t new_price)
+{
+  order_qty_ = static_cast<uint32_t>(static_cast<int32_t>(order_qty_) + size_delta);
+  if (new_price != 0 /* PRICE_UNCHANGED */) {
+    price_ = static_cast<uint32_t>(new_price);
+  }
+}
+
 }

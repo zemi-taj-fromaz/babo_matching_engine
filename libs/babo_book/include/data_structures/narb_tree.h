@@ -105,10 +105,63 @@ public:
     iterator       find(std::uint64_t price)       { return iterator(find_node(price)); }
     const_iterator find(std::uint64_t price) const { return const_iterator(find_node(price)); }
 
-    // Insert an order into the book.
+    // O(1) lookup of a resting order by id (nullptr if not in this tree).
+    [[nodiscard]] simple::SimpleOrder* find_order(std::uint32_t order_id)
+    {
+        auto it = _order_index.find(order_id);
+        if (it == _order_index.end()) return nullptr;
+        return &it->second.pin_loc->at(it->second.index);
+    }
+
+    // ---- Order iterator: individual orders in global priority order (best -> worst) ----
+    // This is the sweep the matching loop drives: it walks the global PIN chain, jumping
+    // across nodes and levels transparently (each ++ is O(1) via global_next).
+    template <bool Const>
+    class order_iterator_impl
+    {
+        using tree_ptr = std::conditional_t<Const, const narb_tree*, narb_tree*>;
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type        = simple::SimpleOrder;
+        using difference_type   = std::ptrdiff_t;
+        using pointer   = std::conditional_t<Const, const simple::SimpleOrder*, simple::SimpleOrder*>;
+        using reference = std::conditional_t<Const, const simple::SimpleOrder&, simple::SimpleOrder&>;
+
+        order_iterator_impl() noexcept : _tree(nullptr), _loc{nullptr, 0} {}
+        order_iterator_impl(tree_ptr t, order_loc l) noexcept : _tree(t), _loc(l) {}
+
+        reference operator*()  const noexcept { return _loc.pin_loc->at(_loc.index); }
+        pointer   operator->() const noexcept { return &_loc.pin_loc->at(_loc.index); }
+
+        order_iterator_impl& operator++() noexcept { _loc = _tree->global_next(_loc); return *this; }
+        order_iterator_impl  operator++(int) noexcept { auto t = *this; ++(*this); return t; }
+
+        [[nodiscard]] order_loc loc() const noexcept { return _loc; }   // for erase / level lookup
+
+        bool operator==(const order_iterator_impl& o) const noexcept { return _loc == o._loc; }
+        bool operator!=(const order_iterator_impl& o) const noexcept { return !(_loc == o._loc); }
+
+    private:
+        tree_ptr  _tree;
+        order_loc _loc;
+    };
+
+    using order_iterator       = order_iterator_impl<false>;
+    using const_order_iterator = order_iterator_impl<true>;
+
+    order_iterator orders_begin() noexcept
+    {
+        return _chain_head ? order_iterator{this, {_chain_head, _chain_head->head()}}
+                           : order_iterator{this, {nullptr, 0}};
+    }
+    order_iterator orders_end() noexcept { return order_iterator{this, {nullptr, 0}}; }
+
+    // Insert an order into the book, keyed by `key` (the price the tree orders on).
     //  Branch 1 (O(1) fast path): does it land on, or between, best and second-best?
     //  Branch 2 (general): find_neighbors, then place into an existing level or a new one.
-    void insert(simple::SimpleOrder& order);
+    void insert(simple::SimpleOrder& order, std::uint64_t key);
+    // Convenience: key on the order's limit price (the normal resting-book case).
+    void insert(simple::SimpleOrder& order) { insert(order, order.price()); }
 
     // O(1) cancel by order id: locate the slot, unlink it from the PIN chain, and
     // clean up an emptied node (and, if the level empties, the level).
@@ -348,9 +401,9 @@ void narb_tree<type>::neighbor_aware_insert(price_level_descriptor *new_node, pr
 }
 
 template <order_type type>
-void narb_tree<type>::insert(simple::SimpleOrder& order)
+void narb_tree<type>::insert(simple::SimpleOrder& order, std::uint64_t price)
 {
-    const std::uint64_t price = order.price();
+    // `price` is the ordering key (limit price for the resting book, stop price for stop trees).
 
     // ---- Branch 1: O(1) fast path against the top of book ----
     if (_best)

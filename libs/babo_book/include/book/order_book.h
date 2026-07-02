@@ -8,6 +8,8 @@
 #include "comparable_price.h"
 #include "logger.h"
 
+#include "../data_structures/narb_tree.h"   // cache-friendly replacement for the side multimaps
+
 #include <sstream>
 #include <map>
 #include <vector>

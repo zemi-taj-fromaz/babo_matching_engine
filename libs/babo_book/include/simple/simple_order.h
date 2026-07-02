@@ -100,6 +100,11 @@ public:
   /// @param new_price the new price
   void replace(uint32_t size_delta, uint32_t new_price);
 
+  /// @brief unconditionally modify qty/price for a book replace (keeps id + filled history).
+  /// @param size_delta change to the total order quantity (may be negative)
+  /// @param new_price the new limit price, or PRICE_UNCHANGED (0) to keep the current price
+  void modify(int32_t size_delta, uint64_t new_price);
+
 private:
   OrderState state_;
   bool is_buy_;
