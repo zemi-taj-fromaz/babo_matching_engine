@@ -7,28 +7,17 @@
 
 #include <type_traits>
 #include <vector>
-#include <memory>
-#include <cmath>
+#include <utility>
 #include <set>
 
 namespace babo::memory
 {
 
 
-
-/**
- * @tparam T Type of the underlying object
- *
- * Union representing a chunk of memory mananaged by the pool.
- * It can be either a single object or a pointer to the next free space in the pool
- */
 template <typename T>
 union PGMemChunk
 {
-    /** Storage for a single object */
     typename std::aligned_storage<sizeof(T), alignof(T)>::type element;
-
-    /** Pointer to the next free space in the pool */
     PGMemChunk *next;
 };
 

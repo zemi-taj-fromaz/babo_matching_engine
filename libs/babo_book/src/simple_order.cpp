@@ -6,7 +6,6 @@
 // design, then try the cache-aware order-book layout from arxiv 2606.01183.
 #include "simple/simple_order.h"
 
-#include <iostream>
 #include <stdexcept>
 
 namespace babo::simple {

@@ -5,8 +5,9 @@
 #ifndef BABOMATCHINGENGINE_PRICE_LEVEL_DESCRIPTOR_H
 #define BABOMATCHINGENGINE_PRICE_LEVEL_DESCRIPTOR_H
 
-#include "../book/types.h"
 #include "pin_node.h"
+
+#include <cstdint>
 
 namespace babo  {
 

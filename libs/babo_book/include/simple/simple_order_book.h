@@ -4,7 +4,6 @@
 
 #include "simple_order.h"
 #include <book/depth_order_book.h>
-#include <iostream>
 
 namespace babo::simple {
 
