@@ -36,8 +36,8 @@ target_precompile_headers(babo_matching_engine PRIVATE src/pch.hpp)
 # --- Static libraries to compare ---
 # liquibook_ref: vendored reference engine (in-tree, frozen baseline).
 # babo_book:     your own engine (you'll be writing this).
-add_subdirectory(libs/liquibook_ref)
-add_subdirectory(libs/babo_book)
+add_subdirectory(libs/liquibook)
+add_subdirectory(libs/babobook)
 
 # --- Benchmark / comparison harness ---
-add_subdirectory(bench)
+#add_subdirectory(bench)

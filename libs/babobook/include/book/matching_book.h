@@ -99,30 +99,55 @@ public:
         }
     }
 
-    // Replace/modify a resting order by id: change size (delta) and/or price, keeping the same
-    // id. Implemented as cancel + re-submit, so a price change / size increase loses time
-    // priority. A repriced order that now crosses will match. new_price == PRICE_UNCHANGED (0)
-    // keeps the current price.
+    // Replace/modify a resting order by id: change size (delta) and/or price, keeping the same id.
+    //   - price unchanged  -> edit the size IN PLACE. A resting order never crosses its own side,
+    //                         so a pure size change can't match; we keep the slot (and thus time
+    //                         priority) and only adjust the level/depth quantities.
+    //   - price changed    -> cancel + re-submit (the new price may cross, and a reprice
+    //                         legitimately loses time priority).
+    // new_price == PRICE_UNCHANGED (0) keeps the current price.
     void replace(std::uint32_t order_id, std::int32_t size_delta, std::uint64_t new_price)
     {
-        simple::SimpleOrder copy;
-        if (simple::SimpleOrder* o = bids_.find_order(order_id))
-        {
-            copy = *o;
-            depth_.close_order(static_cast<std::uint32_t>(o->price()), o->open_qty(), true);
-            bids_.erase(order_id);
-        }
-        else if (simple::SimpleOrder* o2 = asks_.find_order(order_id))
-        {
-            copy = *o2;
-            depth_.close_order(static_cast<std::uint32_t>(o2->price()), o2->open_qty(), false);
-            asks_.erase(order_id);
-        }
-        else
+        // Locate the resting order and its side (bids_ and asks_ are distinct types -> branch).
+        bool is_buy = true;
+        simple::SimpleOrder* o = bids_.find_order(order_id);
+        if (!o) { o = asks_.find_order(order_id); is_buy = false; }
+        if (!o)
         {
             if (order_listener_) order_listener_->on_replace_reject(order_id, "not found");
             return;
         }
+
+        const std::uint64_t cur_price = o->price();
+        const bool reprice = (new_price != book::PRICE_UNCHANGED && new_price != cur_price);
+
+        // --- fast path: size-only change, done in place (time priority retained) ---
+        if (!reprice)
+        {
+            const std::uint32_t open = o->open_qty();
+            // A reduction that meets/exceeds the open qty collapses the order -> cancel it.
+            if (size_delta < 0 && static_cast<std::uint32_t>(-size_delta) >= open)
+            {
+                depth_.close_order(static_cast<std::uint32_t>(cur_price), open, is_buy);
+                if (is_buy) bids_.erase(order_id); else asks_.erase(order_id);
+            }
+            else
+            {
+                o->modify(size_delta, book::PRICE_UNCHANGED);   // order_qty_ += size_delta
+                o->_level->_quantity = static_cast<std::uint32_t>(
+                    static_cast<std::int64_t>(o->_level->_quantity) + size_delta);
+                depth_.change_qty_order(static_cast<std::uint32_t>(cur_price), size_delta, is_buy);
+            }
+            if (order_listener_)
+                order_listener_->on_replace(order_id, size_delta, static_cast<std::uint32_t>(cur_price));
+            notify();
+            return;
+        }
+
+        // --- slow path: price changed, so cancel + re-submit ---
+        simple::SimpleOrder copy = *o;
+        depth_.close_order(static_cast<std::uint32_t>(cur_price), o->open_qty(), is_buy);
+        if (is_buy) bids_.erase(order_id); else asks_.erase(order_id);
 
         copy.modify(size_delta, new_price);
         if (order_listener_)

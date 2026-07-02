@@ -17,13 +17,9 @@ public:
   /// @brief assign
   DepthLevel& operator=(const DepthLevel& rhs);
 
-  /// @brief get price
   const uint32_t& price() const;
-  /// @brief get count
   uint32_t order_count() const;
-  /// @brief get aggregate quantity
   uint32_t aggregate_qty() const;
-  /// @brief is this level part of the excess
   bool is_excess() const { return is_excess_; }
 
   void init(uint32_t price, bool is_excess);
