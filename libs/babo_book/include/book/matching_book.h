@@ -1,7 +1,9 @@
 //
 // Reworked matching core: the book owns nothing; the narb_trees (global PIN chains)
 // own all resting/parked orders by value. The application interacts purely by order id.
-// Composes a book::Depth<SIZE> aggregate tracker for (future) top-of-book visualization.
+// Composes a book::Depth<SIZE> aggregate tracker and the full listener set (order / trade /
+// book-change / depth / bbo), matching what SimpleOrderBook/DepthOrderBook exposed -- but
+// id-based (OrderListener is instantiated on the order id, not a pointer).
 //
 #ifndef BABOMATCHINGENGINE_MATCHING_BOOK_H
 #define BABOMATCHINGENGINE_MATCHING_BOOK_H
@@ -10,12 +12,19 @@
 #include "../simple/simple_order.h"
 #include "types.h"
 #include "depth.h"
+#include "order_listener.h"
+#include "trade_listener.h"
+#include "order_book_listener.h"
+#include "depth_listener.h"
+#include "bbo_listener.h"
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
-namespace babo {
+namespace babo::book {
 
 // A single execution: `maker` was resting, `taker` was the incoming aggressor.
 struct trade
@@ -26,40 +35,76 @@ struct trade
     std::uint64_t price;   // executed at the maker's (resting) price
 };
 
-template <int SIZE = 5>
+// TRADE_CAP is the depth of the inline trade ring (see trades_available/read_trade below).
+// Must be a power of two so the wrap is a mask, not a divide.
+template <int SIZE = 5, std::size_t TRADE_CAP = 256>
 class matching_book
 {
+    static_assert((TRADE_CAP & (TRADE_CAP - 1)) == 0 && TRADE_CAP != 0,
+                  "TRADE_CAP must be a non-zero power of two");
 public:
-    // Submit an order. Stop orders whose trigger hasn't been reached are parked; otherwise
-    // the order matches the opposite side (market crosses everything) and any remainder rests.
+    using DepthTracker = book::Depth<SIZE>;
+
+    // Order events are keyed by order id (the OrderListener template's handle type).
+    using OrderEventListener = book::OrderListener<std::uint32_t>;
+
+    // --- listener registration ---
+    void set_order_listener(OrderEventListener* l)                 noexcept { order_listener_ = l; }
+    void set_trade_listener(book::TradeListener<matching_book>* l) noexcept { trade_listener_ = l; }
+    void set_order_book_listener(book::OrderBookListener<matching_book>* l) noexcept { book_listener_ = l; }
+    void set_depth_listener(book::DepthListener<matching_book>* l) noexcept { depth_listener_ = l; }
+    void set_bbo_listener(book::BboListener<matching_book>* l)     noexcept { bbo_listener_ = l; }
+
+    // Submit an order. Rejected if size is zero; stop orders whose trigger hasn't been reached
+    // are parked; otherwise it matches the opposite side (market crosses everything) and any
+    // remainder rests.
     void add(simple::SimpleOrder order)
     {
-        trades_.clear();
-        if (order.stop_price() != 0 && is_stopped(order))
+        const std::uint32_t id = order.order_id_;
+        if (order.order_qty() == 0)
         {
-            park_stop(order);            // held until the market reaches its stop price
+            if (order_listener_) order_listener_->on_reject(id, "size must be positive");
             return;
         }
-        submit(order);                   // match + rest (updates market price via trades)
-        process_triggered();             // resubmit any stops the trades just triggered
+        if (order_listener_) order_listener_->on_accept(id);   // accepted into the book
+
+        if (order.stop_price() != 0 && is_stopped(order))
+            park_stop(order);                                  // held until the market reaches it
+        else
+        {
+            submit(order);                                     // match + rest (moves market via trades)
+            process_triggered();                               // resubmit any stops the trades triggered
+        }
+        notify();
     }
 
-    // Cancel by id: resting book (feeds depth) or a parked stop (not in depth).
+    // Cancel by id (resting book or a parked stop).
     void cancel(std::uint32_t order_id)
     {
-        if (cancel_side(order_id, bids_, /*is_buy=*/true))  return;
-        if (cancel_side(order_id, asks_, /*is_buy=*/false)) return;
-        stopBids_.erase(order_id);       // parked stops: never in depth
-        stopAsks_.erase(order_id);
+        bool found = cancel_side(order_id, bids_, /*is_buy=*/true)
+                  || cancel_side(order_id, asks_, /*is_buy=*/false);
+        if (!found)   // maybe a parked stop (not in depth)
+        {
+            if      (stopBids_.find_order(order_id)) { stopBids_.erase(order_id); found = true; }
+            else if (stopAsks_.find_order(order_id)) { stopAsks_.erase(order_id); found = true; }
+        }
+        if (found)
+        {
+            if (order_listener_) order_listener_->on_cancel(order_id);
+            notify();
+        }
+        else if (order_listener_)
+        {
+            order_listener_->on_cancel_reject(order_id, "not found");
+        }
     }
 
-    // Replace/modify a resting order by id: change size (delta) and/or price, keeping the
-    // same id. Implemented as cancel + re-submit, so a price change or size increase loses
-    // time priority (re-enters at the back of its new level) -- standard exchange behaviour.
-    // A repriced order that now crosses will match. new_price == PRICE_UNCHANGED (0) keeps price.
+    // Replace/modify a resting order by id: change size (delta) and/or price, keeping the same
+    // id. Implemented as cancel + re-submit, so a price change / size increase loses time
+    // priority. A repriced order that now crosses will match. new_price == PRICE_UNCHANGED (0)
+    // keeps the current price.
     void replace(std::uint32_t order_id, std::int32_t size_delta, std::uint64_t new_price)
     {
-        trades_.clear();
         simple::SimpleOrder copy;
         if (simple::SimpleOrder* o = bids_.find_order(order_id))
         {
@@ -75,13 +120,18 @@ public:
         }
         else
         {
-            return;   // not resting (unknown / parked stop / already gone)
+            if (order_listener_) order_listener_->on_replace_reject(order_id, "not found");
+            return;
         }
 
         copy.modify(size_delta, new_price);
-        if (copy.open_qty() == 0) { depth_.published(); return; }   // reduced to nothing -> cancelled
-        submit(copy);              // re-enter at the new price/qty (may now cross)
+        if (order_listener_)
+            order_listener_->on_replace(order_id, size_delta, static_cast<std::uint32_t>(copy.price()));
+
+        if (copy.open_qty() == 0) { notify(); return; }   // reduced to nothing -> cancelled
+        submit(copy);
         process_triggered();
+        notify();
     }
 
     // Externally set the market price (e.g. from a reference feed); triggers crossed stops.
@@ -89,25 +139,33 @@ public:
     {
         marketPrice_ = px;
         process_triggered();
+        notify();
     }
 
     [[nodiscard]] std::uint64_t market_price() const noexcept { return marketPrice_; }
-    [[nodiscard]] const std::vector<trade>& last_trades() const noexcept { return trades_; }
+
+    // --- trade feed (inline SPSC ring; no heap, no per-op clear) ---
+    // The engine pushes each execution; the caller drains at its own pace. Unread count is just
+    // (write - read). The ring holds the most recent TRADE_CAP unread trades: if the caller falls
+    // more than TRADE_CAP behind, the oldest unread are overwritten -- the trade listener is the
+    // complete, unbounded feed, this is a convenience poll buffer. Typical use:
+    //     while (book.trades_available()) { const trade& t = book.read_trade(); ... }
+    [[nodiscard]] std::uint64_t trades_available() const noexcept { return trade_w_ - trade_r_; }
+    // Pop the oldest unread trade. Precondition: trades_available() > 0.
+    [[nodiscard]] const trade& read_trade() noexcept { return trade_ring_[trade_r_++ & (TRADE_CAP - 1)]; }
     [[nodiscard]] narb_tree<order_type::BID>& bids() noexcept { return bids_; }
     [[nodiscard]] narb_tree<order_type::ASK>& asks() noexcept { return asks_; }
     [[nodiscard]] book::Depth<SIZE>&       depth()       noexcept { return depth_; }
     [[nodiscard]] const book::Depth<SIZE>& depth() const noexcept { return depth_; }
 
 private:
-    // Match against the opposite side, then rest the remainder (unless market).
+    // Match against the opposite side, then rest the remainder (unless market/IOC).
     void submit(simple::SimpleOrder& order)
     {
         const bool is_market = (order.price() == book::MARKET_ORDER_PRICE);
         if (order.is_buy()) match_against(order, asks_);
         else                match_against(order, bids_);
 
-        // Rest the remainder unless it's a market or IOC order (those never rest). A plain
-        // AON that couldn't fill traded nothing, so it rests here as a resting AON.
         if (!is_market && !order.immediate_or_cancel() && order.open_qty() > 0)
         {
             const std::uint32_t rest_qty = order.open_qty();
@@ -116,6 +174,22 @@ private:
             if (is_buy) bids_.insert(order);
             else        asks_.insert(order);
             depth_.add_order(static_cast<std::uint32_t>(px), rest_qty, is_buy);
+        }
+        // Publishing happens once per public op in notify().
+    }
+
+    // Fire the per-operation listeners: book change (always), then depth/bbo if the aggregate
+    // depth changed since the last publish.
+    void notify()
+    {
+        if (book_listener_) book_listener_->on_order_book_change(this);
+        if (depth_.changed())
+        {
+            const std::uint32_t last = depth_.last_published_change();
+            if (depth_listener_) depth_listener_->on_depth_change(this, &depth_);
+            if (bbo_listener_ &&
+                (depth_.bids()->changed_since(last) || depth_.asks()->changed_since(last)))
+                bbo_listener_->on_bbo_change(this, &depth_);
         }
         depth_.published();
     }
@@ -128,8 +202,8 @@ private:
                            : (maker.price() >= in.price());
     }
 
-    // Execute one fill between the incoming order and a resting maker. Updates the maker's
-    // level depth, market price and trade log. Returns whether the maker is now fully filled.
+    // Execute one fill between the incoming order and a resting maker. Updates depth, market
+    // price, trade log, and fires the fill/trade listeners. Returns whether the maker filled.
     bool execute_trade(simple::SimpleOrder& in, simple::SimpleOrder& maker, std::uint32_t qty)
     {
         const std::uint64_t px   = maker.price();
@@ -139,8 +213,13 @@ private:
         maker._level->_quantity -= qty;
         const bool maker_filled = (maker.open_qty() == 0);
         depth_.fill_order(static_cast<std::uint32_t>(px), qty, maker_filled, maker.is_buy());
-        trades_.push_back({maker.order_id_, in.order_id_, qty, px});
-        marketPrice_ = px;                                     // last trade sets the market price
+        trade_ring_[trade_w_ & (TRADE_CAP - 1)] = {maker.order_id_, in.order_id_, qty, px};
+        ++trade_w_;
+        if (trade_w_ - trade_r_ > TRADE_CAP) ++trade_r_;   // consumer fell behind: drop the oldest unread
+        marketPrice_ = px;
+
+        if (order_listener_) order_listener_->on_fill(in.order_id_, maker.order_id_, qty, cost);
+        if (trade_listener_) trade_listener_->on_trade(this, qty, cost);
         return maker_filled;
     }
 
@@ -151,8 +230,7 @@ private:
         else                  match_regular_incoming(in, opp);
     }
 
-    // Regular / IOC incoming: trade greedily best-first; skip any resting AON we can't fully
-    // fill (trade around it -- it stays resting).
+    // Regular / IOC incoming: trade greedily best-first; skip a resting AON we can't fully fill.
     template <class OppTree>
     void match_regular_incoming(simple::SimpleOrder& in, OppTree& opp)
     {
@@ -170,9 +248,7 @@ private:
         }
     }
 
-    // AON incoming: all-or-nothing. Pass 1 plans a feasible full fill (skipping resting AONs
-    // that can't fit within the remaining need); if the whole quantity can be met, Pass 2
-    // commits it. Otherwise nothing trades (the order rests as a resting AON, or cancels if IOC).
+    // AON incoming: plan a feasible full fill, then commit it -- or trade nothing.
     template <class OppTree>
     void match_aon_incoming(simple::SimpleOrder& in, OppTree& opp)
     {
@@ -189,7 +265,6 @@ private:
             if (maker.all_or_none())
             {
                 if (avail <= needed - planned) { plan.push_back({maker.order_id_, avail}); planned += avail; }
-                // else: can't fully fill this resting AON within our need -> skip it
             }
             else
             {
@@ -201,7 +276,7 @@ private:
 
         if (planned < needed) return;   // infeasible -> AON does not trade at all
 
-        for (const cand& c : plan)      // commit: makers are unchanged since planning
+        for (const cand& c : plan)
         {
             simple::SimpleOrder* maker = opp.find_order(c.id);
             if (!maker) continue;
@@ -220,9 +295,6 @@ private:
     }
 
     // --- stop orders ---
-    // A stop is "stopped" (parked) until the market reaches its trigger:
-    //   buy stop  fires when market rises to/above stop_price;
-    //   sell stop fires when market falls to/below stop_price.
     [[nodiscard]] bool is_stopped(const simple::SimpleOrder& o) const noexcept
     {
         return o.is_buy() ? (marketPrice_ < o.stop_price())
@@ -231,22 +303,15 @@ private:
 
     void park_stop(simple::SimpleOrder& o)
     {
-        // Keyed by STOP price. Ordering chosen so the next-to-trigger is "best":
-        //   buy stops  -> ASK order (lowest stop first, triggered as market rises);
-        //   sell stops -> BID order (highest stop first, triggered as market falls).
-        if (o.is_buy()) stopBids_.insert(o, o.stop_price());
-        else            stopAsks_.insert(o, o.stop_price());
+        if (o.is_buy()) stopBids_.insert(o, o.stop_price());   // ASK order: lowest stop first
+        else            stopAsks_.insert(o, o.stop_price());   // BID order: highest stop first
     }
 
-    // Repeatedly trigger crossed stops and resubmit them until the market stabilizes.
-    // (Resubmitting can trade -> move the market -> trigger more stops.)
     void process_triggered()
     {
         for (;;)
         {
             std::vector<simple::SimpleOrder> fired;
-
-            // Buy stops: fire while stop_price <= market (sweep lowest-first, stop above market).
             for (auto it = stopBids_.orders_begin(); it != stopBids_.orders_end(); )
             {
                 if (it->stop_price() > marketPrice_) break;
@@ -256,7 +321,6 @@ private:
                 stopBids_.erase(id);
                 fired.push_back(copy);
             }
-            // Sell stops: fire while stop_price >= market (sweep highest-first, stop below market).
             for (auto it = stopAsks_.orders_begin(); it != stopAsks_.orders_end(); )
             {
                 if (it->stop_price() < marketPrice_) break;
@@ -266,7 +330,6 @@ private:
                 stopAsks_.erase(id);
                 fired.push_back(copy);
             }
-
             if (fired.empty()) break;
             for (auto& o : fired) submit(o);   // now live: match + rest (may move the market)
         }
@@ -277,7 +340,16 @@ private:
     narb_tree<order_type::ASK> stopBids_;  // parked BUY stops, keyed by stop price (lowest first)
     narb_tree<order_type::BID> stopAsks_;  // parked SELL stops, keyed by stop price (highest first)
     book::Depth<SIZE> depth_;              // aggregate top-of-book view
-    std::vector<trade> trades_;            // executions from the most recent add()
+
+    OrderEventListener*                    order_listener_ = nullptr;
+    book::TradeListener<matching_book>*    trade_listener_ = nullptr;
+    book::OrderBookListener<matching_book>* book_listener_ = nullptr;
+    book::DepthListener<matching_book>*    depth_listener_ = nullptr;
+    book::BboListener<matching_book>*      bbo_listener_   = nullptr;
+
+    std::array<trade, TRADE_CAP> trade_ring_;  // inline; no heap
+    std::uint64_t trade_w_ = 0;            // monotonic write cursor (total trades ever executed)
+    std::uint64_t trade_r_ = 0;            // monotonic read  cursor (caller-advanced)
     std::uint64_t marketPrice_ = 0;        // last trade / externally set reference price
 };
 

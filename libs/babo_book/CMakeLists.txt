@@ -4,23 +4,16 @@
 add_library(babo_book STATIC
         src/simple_order.cpp
         include/book/types.h
-        include/book/comparable_price.h
-        include/book/callback.h
-        include/book/order.hpp
-        include/book/order_tracker.h
         include/book/order_listener.h
-        include/book/order_book.h
         include/book/order_book_listener.h
         include/book/trade_listener.h
-        include/book/logger.h
         include/book/depth_constants.h
         include/book/depth_level.h
         include/book/depth.h
         include/book/depth_listener.h
-        include/book/depth_order_book.h
         include/book/bbo_listener.h
+        include/book/matching_book.h
         include/simple/simple_order.h
-        include/simple/simple_order_book.h
         include/data_structures/pin_node.h
         include/data_structures/price_level_descriptor.h
         include/data_structures/narb_tree.h

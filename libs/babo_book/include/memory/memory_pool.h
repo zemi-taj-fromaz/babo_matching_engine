@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <vector>
 #include <utility>
-#include <set>
+#include <unordered_set>
 
 namespace babo::memory
 {
@@ -134,17 +134,17 @@ public:
         }
     }
 
-    inline constexpr size_t getNbElements() const { return nbElements; }
+    [[nodiscard]] size_t getNbElements() const noexcept { return nbElements; }
 
-    inline constexpr size_t getSize() const { return size; }
+    [[nodiscard]] size_t getSize() const noexcept { return size; }
 
     void destroyAll()
     {
         if (maxAllocatedIndex == 0)
             return;
 
-        // Build a set of free list pointers for fast lookup
-        std::set<PGMemChunk<T>*> freeSet;
+        // Build a set of free-list pointers for O(1) membership testing.
+        std::unordered_set<PGMemChunk<T>*> freeSet;
         PGMemChunk<T>* current = freeList;
         while (current != nullptr)
         {
