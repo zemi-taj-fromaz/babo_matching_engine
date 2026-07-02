@@ -101,8 +101,9 @@ public:
     const_iterator cend()   const noexcept { return const_iterator(nullptr); }
 
 
-    iterator find();
-    const_iterator find() const;
+    // Find the price level at `price`, or end() if there is no such level.
+    iterator       find(std::uint64_t price)       { return iterator(find_node(price)); }
+    const_iterator find(std::uint64_t price) const { return const_iterator(find_node(price)); }
 
     // Insert an order into the book.
     //  Branch 1 (O(1) fast path): does it land on, or between, best and second-best?
@@ -119,6 +120,9 @@ public:
 
 
 private:
+    // Locate the level node at `price` (nullptr if absent). Backs find().
+    [[nodiscard]] price_level_descriptor* find_node(std::uint64_t price) const;
+
     // Allocate + initialise a new price level for the given price.
     price_level_descriptor* make_level(std::uint64_t price);
     // Place an order into the global PIN chain (at this level's tail sub-range) + index it.
@@ -170,6 +174,19 @@ template <order_type type>
 price_level_descriptor* narb_tree<type>::get_best()
 {
     return _best;
+}
+
+template <order_type type>
+price_level_descriptor* narb_tree<type>::find_node(std::uint64_t price) const
+{
+    price_level_descriptor* curr = _root;
+    while (curr)
+    {
+        if      (price < curr->_price) curr = curr->left;
+        else if (price > curr->_price) curr = curr->right;
+        else                           return curr;   // exact price match
+    }
+    return nullptr;   // no level at this price
 }
 
 template <order_type type>
