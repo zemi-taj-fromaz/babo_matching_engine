@@ -8,8 +8,6 @@
 #include "comparable_price.h"
 #include "logger.h"
 
-#include "../data_structures/price_level_descriptor.h"
-
 #include <sstream>
 #include <map>
 #include <vector>
@@ -17,7 +15,6 @@
 #include <list>
 #include <functional>
 #include <algorithm>
-#include <unordered_map>
 #include <cstdint>
 
 #ifdef LIQUIBOOK_IGNORES_DEPRECATED_CALLS // TODO CHECK THIS
@@ -195,11 +192,6 @@ private:
 private:
 
   std::string symbol_;
-
-  // O(1) order -> resting location, keyed by order id. Lets cancel/replace/find jump
-  // straight to the order's PIN slot instead of scanning a price level.
-  // Key is uint32_t order id (monotonic, wraps at 2^32); value is the PIN slot location.
-  std::unordered_map<std::uint32_t, order_loc> order_index_;
 
   OrderMap bids_;
   OrderMap asks_;

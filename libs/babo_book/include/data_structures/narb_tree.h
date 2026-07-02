@@ -113,12 +113,31 @@ public:
     // clean up an emptied node (and, if the level empties, the level).
     void erase(std::uint32_t order_id);
 
+    // Debug/testing: verify the red-black invariants (BST order, root black, no red-red,
+    // equal black-height). Returns true if the tree is a valid RB tree.
+    [[nodiscard]] bool validate_rb() const;
+
 
 private:
     // Allocate + initialise a new price level for the given price.
     price_level_descriptor* make_level(std::uint64_t price);
-    // Add an order into a level's PIN chain, record it in the order index.
+    // Place an order into the global PIN chain (at this level's tail sub-range) + index it.
     void place_order(price_level_descriptor* level, simple::SimpleOrder& order);
+
+    // --- global PIN chain helpers ---
+    // Global priority order: _chain_head (best) ... _chain_tail (worst); within a node,
+    // head_->tail_ intra-node links; across nodes, next_node_/prev_node_.
+    order_loc chain_first(simple::SimpleOrder&& ord, price_level_descriptor* lvl);           // empty chain
+    order_loc chain_insert_head(simple::SimpleOrder&& ord, price_level_descriptor* lvl);      // new global best
+    order_loc chain_insert_after(order_loc anchor, simple::SimpleOrder&& ord, price_level_descriptor* lvl);
+    [[nodiscard]] order_loc global_next(order_loc loc) const;   // next order in global priority order
+    [[nodiscard]] order_loc global_prev(order_loc loc) const;   // previous order
+
+    // Relocation cascade: guarantee X has a free slot by rippling boundary orders toward the
+    // tail (reuse a free slot within D_max, else allocate a node at the boundary).
+    static constexpr int kMaxCascadeHops = 16;
+    void make_room(pin_node_t* X);
+    void relocate_tail_to_head(pin_node_t* src, pin_node_t* dst);   // one Push Back hop
 
     // order id -> resting location, for O(1) cancel.
     std::unordered_map<std::uint32_t, order_loc> _order_index;
@@ -126,12 +145,25 @@ private:
     price_level_descriptor* _best = nullptr;
     price_level_descriptor* _root = nullptr;
 
+    // Endpoints of the single global PIN chain for this side.
+    pin_node_t* _chain_head = nullptr;   // holds the best (highest-priority) orders
+    pin_node_t* _chain_tail = nullptr;   // holds the worst
+
     std::uint32_t _node_capacity{};
 
     void insert_rebalance(price_level_descriptor *new_node);
 
     void right_rotate(price_level_descriptor* node);
     void left_rotate(price_level_descriptor* node);
+
+    // --- level removal (empty level) ---
+    void erase_level(price_level_descriptor* z);               // unlink threads/best, RB-delete, recycle
+    void rb_delete_node(price_level_descriptor* z);            // CLRS RB-delete (tree structure only)
+    void rb_delete_fixup(price_level_descriptor* x, price_level_descriptor* x_parent);
+    void transplant(price_level_descriptor* u, price_level_descriptor* v);
+    static price_level_descriptor* tree_minimum(price_level_descriptor* n);
+    static color color_of(price_level_descriptor* n) noexcept { return n ? n->_color : color::BLACK; }
+    static int rb_check(price_level_descriptor* n, std::uint64_t lo, std::uint64_t hi);
 };
 
 template <order_type type>
@@ -321,13 +353,12 @@ void narb_tree<type>::insert(simple::SimpleOrder& order)
         if (better_than_best)
         {
             price_level_descriptor* level = make_level(price);
-            place_order(level, order);
-            // The new level sits immediately beyond the old best on the aggressive side,
-            // so the old best is its only neighbour (numerically: bids -> old best is the
-            // lower/pred side, asks -> the higher/succ side). neighbor_aware_insert then
-            // promotes it to _best (it has no succ for bids / no pred for asks).
+            // Splice into the tree FIRST so pred/succ threads are set before place_order
+            // (which reads them to find the order's slot in the global chain).
+            // The new level sits immediately beyond the old best on the aggressive side.
             if constexpr (type == order_type::BID) neighbor_aware_insert(level, /*pred=*/_best, /*succ=*/nullptr);
             else                                   neighbor_aware_insert(level, /*pred=*/nullptr, /*succ=*/_best);
+            place_order(level, order);
             return;
         }
 
@@ -342,9 +373,9 @@ void narb_tree<type>::insert(simple::SimpleOrder& order)
         if (!next)
         {
             price_level_descriptor* level = make_level(price);
-            place_order(level, order);
             if constexpr (type == order_type::BID) neighbor_aware_insert(level, /*pred=*/nullptr, /*succ=*/_best);
             else                                   neighbor_aware_insert(level, /*pred=*/_best,    /*succ=*/nullptr);
+            place_order(level, order);
             return;
         }
 
@@ -363,8 +394,8 @@ void narb_tree<type>::insert(simple::SimpleOrder& order)
         if (price > lo->_price && price < hi->_price)
         {
             price_level_descriptor* level = make_level(price);
-            place_order(level, order);
             neighbor_aware_insert(level, /*pred=*/lo, /*succ=*/hi);
+            place_order(level, order);
             return;
         }
     }
@@ -378,18 +409,17 @@ void narb_tree<type>::insert(simple::SimpleOrder& order)
     }
     else
     {
-        // New price: create a level, seed it with the order, splice it into the tree.
+        // New price: splice into the tree first (sets pred/succ), then place the order.
         price_level_descriptor* level = make_level(price);
-        place_order(level, order);
         neighbor_aware_insert(level, sr.pred, sr.succ);
+        place_order(level, order);
     }
 }
 
 template <order_type type>
 price_level_descriptor* narb_tree<type>::make_level(std::uint64_t price)
 {
-    // TODO: allocate from a pool instead of `new` (hot path -- avoid per-level heap churn).
-    price_level_descriptor* level = new price_level_descriptor{};
+    price_level_descriptor* level = price_level_descriptor_pool().allocate();  // value-initialised
     level->left = level->right = level->parent = nullptr;
     level->pred = level->succ = nullptr;
     level->_color = color::RED;   // neighbor_aware_insert -> insert_rebalance fixes colours
@@ -404,10 +434,177 @@ price_level_descriptor* narb_tree<type>::make_level(std::uint64_t price)
 template <order_type type>
 void narb_tree<type>::place_order(price_level_descriptor* level, simple::SimpleOrder& order)
 {
-    // Read the id before insert moves the order into its slot, then record where it landed.
-    const std::uint32_t id = order.order_id_;
-    const order_loc loc = level->insert(order);   // appends into the level's PIN chain
+    const std::uint32_t id  = order.order_id_;    // read before the order is moved into a slot
+    const uint32_t       qty = order.open_qty();
+    const bool level_was_empty = level->empty();
+
+    order_loc loc;
+    if (!_chain_head)
+    {
+        loc = chain_first(std::move(order), level);                          // first order on this side
+    }
+    else if (!level_was_empty)
+    {
+        loc = chain_insert_after(level->_tail, std::move(order), level);      // append at this level's tail
+    }
+    else
+    {
+        // New level: insert right after the block of the level immediately BETTER (higher
+        // priority) than it. pred/succ are numeric (pred=lower price, succ=higher); global
+        // priority is descending price for bids, ascending for asks -- so "better" flips.
+        price_level_descriptor* better = (type == order_type::BID) ? level->succ : level->pred;
+        if (better)
+            loc = chain_insert_after(better->_tail, std::move(order), level); // after the better level's block
+        else
+            loc = chain_insert_head(std::move(order), level);                // new global best
+    }
+
+    if (level_was_empty) level->_head = loc;
+    level->_tail = loc;
     _order_index[id] = loc;
+    level->_quantity += qty;
+}
+
+template <order_type type>
+order_loc narb_tree<type>::chain_first(simple::SimpleOrder&& ord, price_level_descriptor* lvl)
+{
+    pin_node_t* node = pin_node_pool().allocate();
+    _chain_head = _chain_tail = node;
+    std::uint16_t s = node->append(std::move(ord));
+    node->at(s)._level = lvl;
+    return {node, s};
+}
+
+template <order_type type>
+order_loc narb_tree<type>::chain_insert_head(simple::SimpleOrder&& ord, price_level_descriptor* lvl)
+{
+    pin_node_t* h = _chain_head;
+    if (!h->full())
+    {
+        std::uint16_t s = h->prepend(std::move(ord));   // new intra-node head = new global head
+        h->at(s)._level = lvl;
+        return {h, s};
+    }
+    // Head node full: prepend a fresh node at the head of the chain.
+    pin_node_t* node = pin_node_pool().allocate();
+    node->set_next_node(h);
+    h->set_prev_node(node);
+    _chain_head = node;
+    std::uint16_t s = node->append(std::move(ord));
+    node->at(s)._level = lvl;
+    return {node, s};
+}
+
+template <order_type type>
+order_loc narb_tree<type>::chain_insert_after(order_loc anchor, simple::SimpleOrder&& ord,
+                                              price_level_descriptor* lvl)
+{
+    pin_node_t* nX = anchor.pin_loc;
+
+    // Fast path: room in the anchor node -> splice in place.
+    if (!nX->full())
+    {
+        std::uint16_t s = nX->insert_after(anchor.index, std::move(ord));
+        nX->at(s)._level = lvl;
+        return {nX, s};
+    }
+
+    // Node full, Case B: anchor is the node's tail -> order belongs at the nX/next boundary.
+    if (anchor.index == nX->tail())
+    {
+        pin_node_t* next = nX->next_node();
+        if (!next)
+        {
+            // nX is the global tail -> extend the chain with a fresh tail node.
+            pin_node_t* node = pin_node_pool().allocate();
+            node->set_prev_node(nX);
+            nX->set_next_node(node);
+            _chain_tail = node;
+            std::uint16_t s = node->append(std::move(ord));
+            node->at(s)._level = lvl;
+            return {node, s};
+        }
+        if (next->full()) make_room(next);                    // free a slot at next's head end
+        std::uint16_t s = next->prepend(std::move(ord));      // new head of next = right after nX's tail
+        next->at(s)._level = lvl;
+        return {next, s};
+    }
+
+    // Node full, Case A: anchor is interior to nX -> order belongs strictly inside nX.
+    // Free a slot in nX via a Push Back cascade (the anchor is safe -- we evict nX's tail).
+    make_room(nX);
+    std::uint16_t s = nX->insert_after(anchor.index, std::move(ord));
+    nX->at(s)._level = lvl;
+    return {nX, s};
+}
+
+template <order_type type>
+void narb_tree<type>::make_room(pin_node_t* X)
+{
+    // Walk toward the tail (up to D_max) for a node with a free slot; else allocate one.
+    pin_node_t* path[kMaxCascadeHops + 2];
+    int len = 0;
+    path[len++] = X;
+    pin_node_t* n = X;
+    int hops = 0;
+    while (n->full() && hops < kMaxCascadeHops)
+    {
+        pin_node_t* nx = n->next_node();
+        if (!nx) break;                 // reached the chain tail
+        n = nx;
+        path[len++] = n;
+        ++hops;
+    }
+    if (n->full())
+    {
+        // No free slot within D_max (or all-full to the chain tail) -> allocate at the boundary.
+        pin_node_t* m     = pin_node_pool().allocate();
+        pin_node_t* after = n->next_node();
+        m->set_prev_node(n);
+        m->set_next_node(after);
+        n->set_next_node(m);
+        if (after) after->set_prev_node(m); else _chain_tail = m;
+        path[len++] = m;
+    }
+    // Ripple from the far end inward: move each node's tail into the next node's head.
+    // Frees exactly one slot in X (path[0]); every dst has room when we move into it.
+    for (int i = len - 2; i >= 0; --i)
+        relocate_tail_to_head(path[i], path[i + 1]);
+}
+
+template <order_type type>
+void narb_tree<type>::relocate_tail_to_head(pin_node_t* src, pin_node_t* dst)
+{
+    const std::uint16_t s_old = src->tail();
+    const order_loc old_loc{src, s_old};
+    price_level_descriptor* L = src->at(s_old)._level;      // embedded back-ptr
+
+    simple::SimpleOrder moved = std::move(src->at(s_old));  // carry payload (+_level) out
+    src->erase(s_old);                                      // free src's tail slot
+    const std::uint16_t s_new = dst->prepend(std::move(moved));   // becomes dst's head (same global pos)
+    const order_loc new_loc{dst, s_new};
+
+    _order_index[dst->at(s_new).order_id_] = new_loc;       // (1) fix id -> loc
+    if (L->_tail == old_loc) L->_tail = new_loc;            // (2) fix owning level's tail
+    if (L->_head == old_loc) L->_head = new_loc;            // (3) fix owning level's head
+}
+
+template <order_type type>
+order_loc narb_tree<type>::global_next(order_loc loc) const
+{
+    const std::uint16_t n = loc.pin_loc->next(loc.index);
+    if (n != pin_node_t::npos) return {loc.pin_loc, n};
+    if (pin_node_t* nn = loc.pin_loc->next_node()) return {nn, nn->head()};
+    return {nullptr, 0};
+}
+
+template <order_type type>
+order_loc narb_tree<type>::global_prev(order_loc loc) const
+{
+    const std::uint16_t p = loc.pin_loc->prev(loc.index);
+    if (p != pin_node_t::npos) return {loc.pin_loc, p};
+    if (pin_node_t* pn = loc.pin_loc->prev_node()) return {pn, pn->tail()};
+    return {nullptr, 0};
 }
 
 template <order_type type>
@@ -417,16 +614,224 @@ void narb_tree<type>::erase(std::uint32_t order_id)
     if (it == _order_index.end()) return;   // unknown / already cancelled
 
     const order_loc loc = it->second;
-    price_level_descriptor* level = loc.pin_loc->level();   // owning level (back-pointer)
+    pin_node_t* node = loc.pin_loc;
+    price_level_descriptor* level = node->at(loc.index)._level;   // embedded back-pointer
     _order_index.erase(it);
 
-    const bool level_empty = level->remove(loc);   // unlink slot + rewire PIN chain
-    if (level_empty)
+    level->_quantity -= node->at(loc.index).open_qty();
+
+    const bool was_head = (level->_head.pin_loc == node && level->_head.index == loc.index);
+    const bool was_tail = (level->_tail.pin_loc == node && level->_tail.index == loc.index);
+
+    bool level_empty = false;
+    if (was_head && was_tail)
     {
-        // The price level has no more orders. It must be removed from the tree.
-        // TODO: RB-delete `level` (fixup pred/succ threads, _best, and free the descriptor).
-        //       Until RB-delete exists, the empty descriptor stays in the tree as a zombie.
+        level->_head = {nullptr, 0};    // was the level's only order
+        level->_tail = {nullptr, 0};
+        level_empty = true;
     }
+    else
+    {
+        // Recompute head/tail BEFORE unlinking (global_next/prev read the live links).
+        if (was_head) level->_head = global_next(loc);
+        if (was_tail) level->_tail = global_prev(loc);
+    }
+
+    node->erase(loc.index);   // unlink from intra-node priority list + recycle slot
+
+    if (node->empty())
+    {
+        // Drop the emptied node out of the global chain and return it to the pool.
+        pin_node_t* prev = node->prev_node();
+        pin_node_t* next = node->next_node();
+        if (prev) prev->set_next_node(next); else _chain_head = next;
+        if (next) next->set_prev_node(prev); else _chain_tail = prev;
+        pin_node_pool().release(node);
+    }
+
+    if (level_empty)
+        erase_level(level);   // remove the empty level from the tree + recycle its descriptor
+}
+
+// ---- level removal: pred/succ threads + best, then RB-delete, then recycle ----
+
+template <order_type type>
+void narb_tree<type>::erase_level(price_level_descriptor* z)
+{
+    price_level_descriptor* p = z->pred;
+    price_level_descriptor* s = z->succ;
+
+    // Advance _best to the next-best level (bids: worse=lower=pred ; asks: worse=higher=succ).
+    if (z == _best)
+        _best = (type == order_type::BID) ? p : s;
+
+    // Unlink from the in-order (price) thread list.
+    if (p) p->succ = s;
+    if (s) s->pred = p;
+
+    rb_delete_node(z);                           // remove from the RB tree (structure only)
+    price_level_descriptor_pool().release(z);    // return the descriptor to its pool
+}
+
+template <order_type type>
+price_level_descriptor* narb_tree<type>::tree_minimum(price_level_descriptor* n)
+{
+    while (n->left) n = n->left;
+    return n;
+}
+
+template <order_type type>
+void narb_tree<type>::transplant(price_level_descriptor* u, price_level_descriptor* v)
+{
+    if (!u->parent)               _root = v;
+    else if (u == u->parent->left) u->parent->left = v;
+    else                           u->parent->right = v;
+    if (v) v->parent = u->parent;
+}
+
+template <order_type type>
+void narb_tree<type>::rb_delete_node(price_level_descriptor* z)
+{
+    price_level_descriptor* y = z;
+    color y_original = y->_color;
+    price_level_descriptor* x = nullptr;
+    price_level_descriptor* x_parent = nullptr;   // tracked separately (x may be null)
+
+    if (!z->left)
+    {
+        x = z->right;
+        x_parent = z->parent;
+        transplant(z, z->right);
+    }
+    else if (!z->right)
+    {
+        x = z->left;
+        x_parent = z->parent;
+        transplant(z, z->left);
+    }
+    else
+    {
+        y = tree_minimum(z->right);   // in-order successor (== z->succ)
+        y_original = y->_color;
+        x = y->right;
+        if (y->parent == z)
+        {
+            x_parent = y;             // x may be null; its parent is conceptually y
+        }
+        else
+        {
+            x_parent = y->parent;
+            transplant(y, y->right);
+            y->right = z->right;
+            y->right->parent = y;
+        }
+        transplant(z, y);
+        y->left = z->left;
+        y->left->parent = y;
+        y->_color = z->_color;
+    }
+
+    if (y_original == color::BLACK)
+        rb_delete_fixup(x, x_parent);
+}
+
+template <order_type type>
+void narb_tree<type>::rb_delete_fixup(price_level_descriptor* x, price_level_descriptor* x_parent)
+{
+    while (x != _root && color_of(x) == color::BLACK)
+    {
+        if (x == x_parent->left)
+        {
+            price_level_descriptor* w = x_parent->right;              // sibling (non-null by RB invariant)
+            if (color_of(w) == color::RED)
+            {
+                w->_color = color::BLACK;
+                x_parent->_color = color::RED;
+                left_rotate(x_parent);
+                w = x_parent->right;
+            }
+            if (color_of(w->left) == color::BLACK && color_of(w->right) == color::BLACK)
+            {
+                w->_color = color::RED;
+                x = x_parent;
+                x_parent = x->parent;
+            }
+            else
+            {
+                if (color_of(w->right) == color::BLACK)
+                {
+                    if (w->left) w->left->_color = color::BLACK;
+                    w->_color = color::RED;
+                    right_rotate(w);
+                    w = x_parent->right;
+                }
+                w->_color = x_parent->_color;
+                x_parent->_color = color::BLACK;
+                if (w->right) w->right->_color = color::BLACK;
+                left_rotate(x_parent);
+                x = _root;               // done
+                x_parent = nullptr;
+            }
+        }
+        else
+        {
+            price_level_descriptor* w = x_parent->left;
+            if (color_of(w) == color::RED)
+            {
+                w->_color = color::BLACK;
+                x_parent->_color = color::RED;
+                right_rotate(x_parent);
+                w = x_parent->left;
+            }
+            if (color_of(w->right) == color::BLACK && color_of(w->left) == color::BLACK)
+            {
+                w->_color = color::RED;
+                x = x_parent;
+                x_parent = x->parent;
+            }
+            else
+            {
+                if (color_of(w->left) == color::BLACK)
+                {
+                    if (w->right) w->right->_color = color::BLACK;
+                    w->_color = color::RED;
+                    left_rotate(w);
+                    w = x_parent->left;
+                }
+                w->_color = x_parent->_color;
+                x_parent->_color = color::BLACK;
+                if (w->left) w->left->_color = color::BLACK;
+                right_rotate(x_parent);
+                x = _root;
+                x_parent = nullptr;
+            }
+        }
+    }
+    if (x) x->_color = color::BLACK;
+}
+
+// ---- RB invariant checker (debug/testing) ----
+// Returns the black-height of the subtree, or -1 if any invariant is violated.
+template <order_type type>
+int narb_tree<type>::rb_check(price_level_descriptor* n, std::uint64_t lo, std::uint64_t hi)
+{
+    if (!n) return 1;   // null leaves are black
+    if (n->_price <= lo || n->_price >= hi) return -1;                 // BST order (distinct prices)
+    if (n->_color == color::RED &&
+        (color_of(n->left) == color::RED || color_of(n->right) == color::RED))
+        return -1;                                                    // no red-red
+    const int l = rb_check(n->left,  lo, n->_price);
+    const int r = rb_check(n->right, n->_price, hi);
+    if (l == -1 || r == -1 || l != r) return -1;                      // equal black-height
+    return l + (n->_color == color::BLACK ? 1 : 0);
+}
+
+template <order_type type>
+bool narb_tree<type>::validate_rb() const
+{
+    if (!_root) return true;
+    if (_root->_color != color::BLACK) return false;
+    return rb_check(_root, 0, ~static_cast<std::uint64_t>(0)) != -1;
 }
 
 }

@@ -4,6 +4,8 @@
 
 #include <book/types.h>
 
+namespace babo { struct price_level_descriptor; }   // fwd-decl: orders back-point to their level
+
 namespace babo::simple {
 
 enum OrderState {
@@ -112,6 +114,10 @@ private:
 
 public:
   uint32_t order_id_;   // non-const so orders are assignable into pin_node slots
+
+  // Back-pointer to the owning price level. Travels with the payload on relocation,
+  // so a slot's owning level is always node->at(slot)._level (O(1), no lookup).
+  babo::price_level_descriptor* _level = nullptr;
 };
 
 }
