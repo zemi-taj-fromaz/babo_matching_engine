@@ -8,7 +8,7 @@ namespace liquibook { namespace book {
 /// @brief generic listener of top-of-book events
 template <class OrderBook>
 class BboListener {
-public
+public:
   /// @brief callback for top of book change
   virtual void on_bbo_change(
       const OrderBook* book, 

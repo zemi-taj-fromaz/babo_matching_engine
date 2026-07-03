@@ -33,11 +33,44 @@ target_link_libraries(babo_matching_engine PRIVATE spdlog::spdlog)
 # the PCH (which includes <spdlog/spdlog.h>) is compiled.
 target_precompile_headers(babo_matching_engine PRIVATE src/pch.hpp)
 
+
+enable_testing()
+include(CTest)
+
+# Fix for Boost/Winsock conflicts in tests
+include(FetchContent)
+FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG v1.17.x
+)
+
+# Force static gtest/gmock — building them as DLLs with -fsanitize=undefined embeds
+# the UBSan standalone runtime inside libgtest.dll, causing duplicate symbol errors
+# when libgmock.dll then also pulls in libclang_rt.ubsan_standalone.a.
+#set(BUILD_SHARED_LIBS OFF)
+#set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+message(STATUS "PROJECT NAME  ${PROJECT_NAME}")
+message(STATUS "CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}")
+
+include(CheckIPOSupported)
+check_ipo_supported(RESULT IPO_SUPPORTED OUTPUT IPO_ERROR)
+
+if (IPO_SUPPORTED)
+    message(STATUS "IPO / LTO enabled")
+else ()
+    message(STATUS "IPO / LTO not supported: <${IPO_ERROR}>")
+endif ()
+
 # --- Static libraries to compare ---
 # liquibook_ref: vendored reference engine (in-tree, frozen baseline).
 # babo_book:     your own engine (you'll be writing this).
 add_subdirectory(libs/liquibook)
 add_subdirectory(libs/babobook)
+add_subdirectory(test/babo_test)
+add_subdirectory(test/liqui_test)
 
 # --- Benchmark / comparison harness ---
 #add_subdirectory(bench)

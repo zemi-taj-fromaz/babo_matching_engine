@@ -30,6 +30,11 @@ public:
               uint32_t stop_price = 0,
               book::OrderConditions conditions = book::OrderCondition::oc_no_conditions);
 
+  /// @brief test hook: reset the auto-increment id generator so the next
+  /// constructed order gets id 1 again. Lets each test case start from a
+  /// deterministic id sequence (ids are only required unique per book lifetime).
+  static void reset_id_generator() { last_order_id_ = 0; }
+
   /// @brief get the order's state
   const OrderState& state() const;
 

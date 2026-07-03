@@ -6,6 +6,8 @@
 
 #include "depth_constants.h"
 
+#include <stdexcept>
+
 namespace babo::book {
 
 /// @brief a single level of the limit order book aggregated by price
