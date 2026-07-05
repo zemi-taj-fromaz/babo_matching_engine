@@ -669,10 +669,15 @@ int main(int argc, char** argv) {
             }
             bool flushed = (std::fflush(hfp) == 0);
             std::fclose(hfp);
-            if (flushed && std::rename(tmp_path.c_str(), hash_path.c_str()) != 0) {
+            // std::rename() does NOT replace an existing destination on Windows
+            // (it fails with EEXIST); std::filesystem::rename() atomically
+            // overwrites on every platform.
+            std::error_code rename_ec;
+            if (flushed) std::filesystem::rename(tmp_path, hash_path, rename_ec);
+            if (flushed && rename_ec) {
                 std::fprintf(stderr,
                     "ERROR: could not rename %s -> %s: %s\n",
-                    tmp_path.c_str(), hash_path.c_str(), std::strerror(errno));
+                    tmp_path.c_str(), hash_path.c_str(), rename_ec.message().c_str());
                 std::remove(tmp_path.c_str());
             } else if (!flushed) {
                 std::fprintf(stderr,

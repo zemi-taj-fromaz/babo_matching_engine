@@ -44,3 +44,14 @@ add_custom_command(TARGET harness POST_BUILD
                 $<TARGET_FILE_DIR:harness>/reference
         COMMENT "Staging reference/ next to harness.exe")
 
+# The harness dlopens the baseline adapter BY NAME from its own directory
+# (--baseline and the audit look for ./liquibook_adapter.<dll|so>), so stage the
+# adapter dll next to harness.exe. The harness does not LINK the adapter (it
+# loads it at runtime), so there is no implicit build order — add_dependencies
+# forces the adapter to build first, before this copy runs.
+add_dependencies(harness liquibook_adapter)
+add_custom_command(TARGET harness POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:liquibook_adapter> $<TARGET_FILE_DIR:harness>
+        COMMENT "Staging liquibook_adapter next to harness.exe")
+
