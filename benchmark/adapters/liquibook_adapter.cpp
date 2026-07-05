@@ -74,11 +74,15 @@ class Listener : public lb::OrderListener<LO*> {
 public:
     void on_accept(LO* const&) override {}
     void on_fill(LO* const& taker, LO* const& maker,
-                 lb::Quantity qty, lb::Price price) override {
+                 lb::Quantity qty, lb::Cost cost) override {
         me_report_t r{};
         r.type            = ME_TRADE;
         r.sequence_number = g_seq;
-        r.price_ticks     = static_cast<int64_t>(price);   // maker's resting price
+        // liquibook's on_fill 4th arg is fill_COST (= price * qty), NOT price
+        // (Price and Cost are both uint32_t, so the previously-mislabeled `price`
+        // param compiled silently and this field wrongly reported the cost). The
+        // ABI wants the maker's resting price, so divide the cost back out.
+        r.price_ticks     = static_cast<int64_t>(cost / qty);   // maker's resting price
         r.quantity        = static_cast<uint32_t>(qty);
         // Indexed loads into the reverse map, written on the clock when each
         // SimpleOrder was constructed (engine_on_*); only its capacity is

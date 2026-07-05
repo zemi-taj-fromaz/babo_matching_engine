@@ -616,6 +616,9 @@ int main(int argc, char** argv) {
 
     // --- correctness --------------------------------------------------------
     std::string computed = compute_canonical_hash(drain.collected);
+    // Debug: ME_DUMP=<path> writes the full report stream for diffing engines.
+    if (const char* dump = std::getenv("ME_DUMP"))
+        write_canonical_output(drain.collected, dump);
     std::string expected, status;
     const std::string hash_path = "reference/correctness_hash.txt";
     const std::string want_tag =
