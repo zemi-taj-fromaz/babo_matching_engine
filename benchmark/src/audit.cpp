@@ -21,8 +21,12 @@
 
 // Per-OS thread enumeration: Windows Toolhelp, macOS Mach, Linux procfs.
 #if defined(_WIN32)
-#  define WIN32_LEAN_AND_MEAN
-#  define NOMINMAX               // keep <windows.h> from clobbering std::min below
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  ifndef NOMINMAX             // keep <windows.h> from clobbering std::min below
+#    define NOMINMAX
+#  endif
 #  include <windows.h>
 #  include <tlhelp32.h>
 #elif defined(__APPLE__)

@@ -34,7 +34,15 @@
 #include <vector>
 #include <algorithm>
 #include <numeric>
+#include <math.h>
 #include <string>
+
+// M_PI is not standard C++ — MSVC/Clang omit it from <cmath> unless
+// _USE_MATH_DEFINES is set before the include. Define it portably here; the
+// guard makes this a no-op on platforms (glibc/mingw) that already provide it.
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 namespace {
 

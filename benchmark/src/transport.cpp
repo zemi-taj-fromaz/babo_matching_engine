@@ -21,7 +21,7 @@
 
 namespace {
 
-using ReportQueue = RigtorpSPSCQueueWrapper<me_report_t>;
+using ReportQueue = RigtorpSPSCQueueWrapper;
 
 void* dflt_create(uint32_t capacity) {
     return new (std::nothrow) ReportQueue(capacity);

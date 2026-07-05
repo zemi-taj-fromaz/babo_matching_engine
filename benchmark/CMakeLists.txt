@@ -29,5 +29,18 @@ add_executable(harness
 )
 
 target_include_directories(harness PRIVATE api third_party)
-target_link_libraries(harness PRIVATE SPSCQueue::SPSCQueue ${CMAKE_DL_LIBS})
+target_link_libraries(harness PRIVATE SPSCQueue::SPSCQueue Threads::Threads ${CMAKE_DL_LIBS})
+if (WIN32)
+    target_link_libraries(harness PRIVATE advapi32)   # platform.cpp RegGetValueA
+endif()
+
+# The harness resolves reference/correctness_hash.txt relative to the CURRENT
+# WORKING DIRECTORY, not the source tree — so stage reference/ next to
+# harness.exe on every build. Run the harness from its own output dir and it
+# finds the hashes (PASS/FAIL instead of NO REFERENCE).
+add_custom_command(TARGET harness POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${CMAKE_CURRENT_SOURCE_DIR}/reference
+                $<TARGET_FILE_DIR:harness>/reference
+        COMMENT "Staging reference/ next to harness.exe")
 

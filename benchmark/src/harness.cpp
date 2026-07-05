@@ -24,13 +24,13 @@
  *   ./harness --baseline quantcup --scenario normal --write-reference
  */
 #include "harness.h"
+#include "platform.hpp"
+#include <filesystem>
 
-#include <dlfcn.h>
-#include <pthread.h>
-#include <sched.h>
-#include <signal.h>
-#include <unistd.h>
-#include <sys/stat.h>
+#include <signal.h>              // crash-signal guards on POSIX; SIGABRT/SIGFPE on Windows
+#if !defined(_WIN32)
+#  include <unistd.h>            // write(), STDERR_FILENO for the async-safe crash message
+#endif
 
 #include <atomic>
 #include <cerrno>
@@ -40,17 +40,26 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <filesystem>           // portable file_exists / mkdir
 #include <map>
 #include <random>
 #include <string>
 #include <thread>
 #include <vector>
 
-#ifdef __aarch64__
-#define cpu_pause() asm volatile("yield" ::: "memory")
+// Spin-loop pause hint: PAUSE on x86, YIELD on ARM, no-op elsewhere.
+#if defined(__aarch64__) || defined(_M_ARM64)
+#  if defined(_MSC_VER)
+#    include <intrin.h>
+#    define cpu_pause() __yield()
+#  else
+#    define cpu_pause() asm volatile("yield" ::: "memory")
+#  endif
+#elif defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
+#  include <immintrin.h>
+#  define cpu_pause() _mm_pause()
 #else
-#include <immintrin.h>
-#define cpu_pause() _mm_pause()
+#  define cpu_pause() ((void)0)
 #endif
 
 namespace {
@@ -69,7 +78,7 @@ enum class Mode { PERF, AUDIT };
 /* ---- engine shared-library binding --------------------------------------- */
 template <typename Fn>
 bool bind(void* h, const char* sym, Fn& out, bool required = true) {
-    out = reinterpret_cast<Fn>(dlsym(h, sym));
+    out = reinterpret_cast<Fn>(plat::dl_sym(h, sym));
     if (!out && required) {
         std::fprintf(stderr, "ERROR: engine missing required symbol '%s'\n", sym);
         return false;
@@ -78,9 +87,9 @@ bool bind(void* h, const char* sym, Fn& out, bool required = true) {
 }
 
 bool load_engine(const std::string& path, EngineLib& e) {
-    e.handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+    e.handle = plat::dl_open(path.c_str());
     if (!e.handle) {
-        std::fprintf(stderr, "ERROR: dlopen(%s): %s\n", path.c_str(), dlerror());
+        std::fprintf(stderr, "ERROR: dl_open(%s): %s\n", path.c_str(), plat::dl_error().c_str());
         return false;
     }
     bool ok = bind(e.handle, "engine_init",           e.init)
@@ -99,7 +108,7 @@ bool load_engine(const std::string& path, EngineLib& e) {
     // an engine that exports engine_on_batch (for before/after comparisons).
     if (std::getenv("ME_NO_BATCH")) e.on_batch = nullptr;
     if (!ok) {
-        dlclose(e.handle);
+        plat::dl_close(e.handle);
         e.handle = nullptr;
     }
     return ok;
@@ -110,17 +119,11 @@ bool load_engine(const std::string& path, EngineLib& e) {
  * the run is correct but the throughput is meaningless; callers must propagate
  * the false return through to the VALID gate so an unpinned run is INVALID. */
 bool pin_to_core(int core) {
-    if (core < 0) return true;
-    cpu_set_t set;
-    CPU_ZERO(&set);
-    CPU_SET(core, &set);
-    if (pthread_setaffinity_np(pthread_self(), sizeof(set), &set) != 0) {
-        std::fprintf(stderr,
-            "ERROR: could not pin thread to core %d — affinity is required for "
-            "valid benchmark numbers. The run will be marked INVALID.\n", core);
-        return false;
-    }
-    return true;
+    if (plat::pin_current_thread(core)) return true;
+    std::fprintf(stderr,
+        "ERROR: could not pin thread to core %d — affinity is required for "
+        "valid benchmark numbers. The run will be marked INVALID.\n", core);
+    return false;
 }
 
 /* ---- workload file ------------------------------------------------------- */
@@ -153,8 +156,8 @@ static_assert(sizeof(PreparedMsg) == sizeof(me_msg_t),
               "PreparedMsg must match the me_msg_t ABI layout");
 
 bool file_exists(const std::string& p) {
-    struct stat st;
-    return stat(p.c_str(), &st) == 0;
+    std::error_code ec;
+    return std::filesystem::exists(p, ec);
 }
 
 /* ---- the drainer thread -------------------------------------------------- */
@@ -205,11 +208,33 @@ void drainer_main(DrainState* s) {
 }
 
 /* ---- defensive guards ---------------------------------------------------- */
-[[noreturn]] void on_fatal_signal(int sig) {
-    const char* msg = (sig == SIGALRM)
-        ? "\nERROR: engine run exceeded the time limit — reporting as failed.\n"
-        : "\nERROR: engine crashed (fatal signal) — reporting as failed.\n";
-    ssize_t w = write(STDERR_FILENO, msg, std::strlen(msg));
+// A crash in engine-supplied code (or the drainer touching its transport) is
+// reported as a failed run rather than silently taking down the harness. The
+// run-timeout is handled separately by a plat::Watchdog (no SIGALRM here).
+#if defined(_WIN32)
+static void report_crash_and_exit() {
+    static const char msg[] =
+        "\nERROR: engine crashed (fatal fault) — reporting as failed.\n";
+    std::fputs(msg, stderr);
+    std::fflush(stderr);
+    _exit(3);
+}
+LONG WINAPI on_seh_exception(EXCEPTION_POINTERS*) {
+    report_crash_and_exit();          // access violation, illegal instruction, etc.
+    return EXCEPTION_EXECUTE_HANDLER;  // unreached
+}
+void on_abort_signal(int) { report_crash_and_exit(); }
+
+void install_guards() {
+    SetUnhandledExceptionFilter(on_seh_exception);   // Windows SEH crashes
+    ::signal(SIGABRT, on_abort_signal);
+    ::signal(SIGFPE,  on_abort_signal);
+}
+#else
+[[noreturn]] void on_fatal_signal(int /*sig*/) {
+    static const char msg[] =
+        "\nERROR: engine crashed (fatal signal) — reporting as failed.\n";
+    ssize_t w = write(STDERR_FILENO, msg, sizeof(msg) - 1);
     (void)w;
     _exit(3);
 }
@@ -218,7 +243,7 @@ void install_guards() {
     struct sigaction sa;
     std::memset(&sa, 0, sizeof(sa));
     sa.sa_handler = on_fatal_signal;
-    for (int sig : { SIGSEGV, SIGABRT, SIGBUS, SIGFPE, SIGALRM }) {
+    for (int sig : { SIGSEGV, SIGABRT, SIGBUS, SIGFPE }) {
         if (sigaction(sig, &sa, nullptr) != 0) {
             std::fprintf(stderr,
                 "ERROR: sigaction(%d) failed: %s — fatal-signal reporting will "
@@ -227,6 +252,7 @@ void install_guards() {
         }
     }
 }
+#endif
 
 }  // namespace
 
@@ -329,13 +355,13 @@ int main(int argc, char** argv) {
     const char* mode_name = (mode == Mode::PERF) ? "perf" : "audit";
 
     std::string engine_path = !engine_arg.empty()
-        ? engine_arg : ("./" + baseline + "_adapter.so");
+        ? engine_arg : ("./" + baseline + plat::engine_suffix());
     std::string engine_name;
     {
         std::string b = !baseline.empty() ? baseline : engine_arg;
         size_t s = b.find_last_of('/');
         engine_name = (s == std::string::npos) ? b : b.substr(s + 1);
-        for (const char* suf : { ".so", "_adapter" }) {
+        for (const char* suf : { ".so", ".dll", "_adapter" }) {
             size_t p = engine_name.rfind(suf);
             if (p != std::string::npos && p + std::strlen(suf) == engine_name.size())
                 engine_name.erase(p);
@@ -363,7 +389,14 @@ int main(int argc, char** argv) {
     std::string workload_path = "orders_" + scenario + "_s" + std::to_string(seed) +
                                 "_n" + std::to_string(count) + ".bin";
     if (!file_exists(workload_path)) {
-        std::string cmd = "./generator " + scenario + " " + workload_path + " " +
+#if defined(_WIN32)
+        // Explicit cwd-relative: modern cmd.exe does NOT search the current
+        // directory for a bare exe name, so ".\generator.exe" is required.
+        const char* gen = ".\\generator.exe";
+#else
+        const char* gen = "./generator";
+#endif
+        std::string cmd = std::string(gen) + " " + scenario + " " + workload_path + " " +
                           std::to_string(count) + " " + std::to_string(seed);
         std::fprintf(stderr, "Generating workload: %s\n", cmd.c_str());
         if (std::system(cmd.c_str()) != 0) {
@@ -485,7 +518,7 @@ int main(int argc, char** argv) {
     std::random_device rd;
     uint64_t verify_seed =
           (static_cast<uint64_t>(rd()) << 32) ^ static_cast<uint64_t>(rd())
-        ^ (static_cast<uint64_t>(getpid()) << 48)
+        ^ (static_cast<uint64_t>(plat::process_id()) << 48)
         ^ static_cast<uint64_t>(
               std::chrono::steady_clock::now().time_since_epoch().count());
     std::vector<size_t> audit_idx =
@@ -512,7 +545,12 @@ int main(int argc, char** argv) {
 
     std::printf("Running benchmark (%zu messages, scenario=%s, mode=%s)...\n",
                 workload.size(), scenario.c_str(), mode_name);
-    alarm(RUN_TIMEOUT_S);
+    plat::Watchdog run_watchdog(RUN_TIMEOUT_S, [] {
+        static const char m[] =
+            "\nERROR: engine run exceeded the time limit — reporting as failed.\n";
+        std::fputs(m, stderr); std::fflush(stderr);
+        _exit(3);
+    });
     auto t0 = std::chrono::steady_clock::now();
 
     if (eng.on_batch) {
@@ -547,7 +585,7 @@ int main(int argc, char** argv) {
     transport->flush(queue);   // publish any reports a batching transport buffered
 
     auto t1 = std::chrono::steady_clock::now();
-    alarm(0);
+    run_watchdog.cancel();
     int threads_after_run = current_thread_count();
 
     drain.running.store(false, std::memory_order_release);
@@ -608,7 +646,7 @@ int main(int argc, char** argv) {
     };
 
     if (write_reference) {
-        mkdir("reference", 0755);
+        { std::error_code ec; std::filesystem::create_directories("reference", ec); }
         // canonical_output.txt is the canonical published dump. Don't clobber
         // it on a non-canonical write; capture a per-scenario copy instead.
         const bool is_canonical = (scenario == "normal" && seed == 23ULL);
@@ -664,7 +702,7 @@ int main(int argc, char** argv) {
     AuditReport audit;
     if (mode == Mode::AUDIT) {
         std::string base_name = (engine_name == "liquibook") ? "quantcup" : "liquibook";
-        std::string base_path = "./" + base_name + "_adapter.so";
+        std::string base_path = "./" + base_name + plat::engine_suffix();
         audit.baseline = base_name;
         if (!file_exists(base_path)) {
             audit.note = "baseline '" + base_name +
@@ -674,12 +712,17 @@ int main(int argc, char** argv) {
             if (!load_engine(base_path, base)) {
                 audit.note = "baseline '" + base_name + "' failed to load";
             } else {
-                alarm(120);
+                plat::Watchdog audit_watchdog(120, [] {
+                    static const char m[] =
+                        "\nERROR: state audit exceeded the time limit — reporting as failed.\n";
+                    std::fputs(m, stderr); std::fflush(stderr);
+                    _exit(3);
+                });
                 audit = run_state_audit(base, workload, ut_snaps);
-                alarm(0);
+                audit_watchdog.cancel();
                 audit.baseline    = base_name;
                 audit.verify_seed = verify_seed;
-                dlclose(base.handle);
+                plat::dl_close(base.handle);
             }
         }
     }
@@ -776,11 +819,16 @@ int main(int argc, char** argv) {
 
     std::printf("\nVerdict: %s\n", valid ? "VALID" : "INVALID");
 
-    mkdir("results", 0755);
+    { std::error_code ec; std::filesystem::create_directories("results", ec); }
     char ts[32];
     std::time_t now = std::time(nullptr);
     std::tm tmv;
-    std::strftime(ts, sizeof(ts), "%Y%m%dT%H%M%S", localtime_r(&now, &tmv));
+#if defined(_WIN32)
+    localtime_s(&tmv, &now);        // note: (tm*, time_t*) — reversed vs POSIX
+#else
+    localtime_r(&now, &tmv);
+#endif
+    std::strftime(ts, sizeof(ts), "%Y%m%dT%H%M%S", &tmv);
     std::string result_path = "results/" + engine_name + "_" + scenario + "_" +
                               mode_name + "_" + ts + ".json";
     FILE* jf = std::fopen(result_path.c_str(), "wb");
@@ -829,6 +877,6 @@ int main(int argc, char** argv) {
     }
 
     transport->destroy(queue);
-    dlclose(eng.handle);
+    plat::dl_close(eng.handle);
     return valid ? 0 : 1;
 }

@@ -62,13 +62,18 @@ OrderTracker<OrderPtr>::OrderTracker(
   conditions_(conditions)
 {
 #if defined(LIQUIBOOK_ORDER_KNOWS_CONDITIONS)
+  // Bug fix: these must OR into the MEMBER conditions_, not the local parameter
+  // `conditions` (whose value was already copied into conditions_ above and is
+  // discarded when the ctor returns). Upstream defect documented in the flash1
+  // benchmark's docs/PATCHES.md; the adapter also routes around it by passing
+  // conditions through book.add(order, conditions).
   if(order->all_or_none())
   {
-    conditions |= oc_all_or_none;
+    conditions_ |= oc_all_or_none;
   }
   if(order->immediate_or_cancel())
   {
-    conditions |= oc_immediate_or_cancel;
+    conditions_ |= oc_immediate_or_cancel;
   }
 #endif
 }

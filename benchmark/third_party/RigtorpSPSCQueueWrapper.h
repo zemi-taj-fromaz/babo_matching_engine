@@ -3,11 +3,11 @@
 #include <rigtorp/SPSCQueue.h>
 #include "matching_engine_api.h"   // me_report_t
 
-class ReportQueue {
+class RigtorpSPSCQueueWrapper {
     rigtorp::SPSCQueue<me_report_t> q_;
 
 public:
-    explicit ReportQueue(size_t capacity) : q_(capacity) {}
+    explicit RigtorpSPSCQueueWrapper(size_t capacity) : q_(capacity) {}
 
     // producer: non-blocking enqueue -> your transport's push(bool)
     bool push(const me_report_t& r) { return q_.try_push(r); }
