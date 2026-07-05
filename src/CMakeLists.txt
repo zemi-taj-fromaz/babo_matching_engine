@@ -12,3 +12,9 @@ add_executable(babo_perf     babo_perf_order_book.cpp)
 add_executable(babo_latency  babo_latency_order_book.cpp)
 target_link_libraries(babo_perf    PRIVATE babobook)
 target_link_libraries(babo_latency PRIVATE babobook)
+
+# --- Paper-methodology replica (arXiv 2606.01183 workload) ---
+# Deterministic workload generator (power-law depth + GBM mid + lifetime traces),
+# engine-agnostic. workload_stats validates the generated stream's statistics.
+add_executable(workload_stats bench/workload_stats.cpp)
+target_compile_features(workload_stats PRIVATE cxx_std_20)

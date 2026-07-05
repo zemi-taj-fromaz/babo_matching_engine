@@ -71,11 +71,11 @@ add_subdirectory(libs/liquibook)
 add_subdirectory(libs/babobook)
 add_subdirectory(test/babo_test)
 add_subdirectory(test/liqui_test)
+add_subdirectory(benchmark)
 
 # --- Order-book benchmark executables ---
 # Defined in src/CMakeLists.txt; added here (after the engine libraries) so the
 # bench targets can link liquibook_ref / babobook.
 add_subdirectory(src)
-
 # --- Benchmark / comparison harness ---
 #add_subdirectory(bench)

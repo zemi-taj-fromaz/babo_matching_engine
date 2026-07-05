@@ -11,9 +11,8 @@
 # This is a frozen baseline for benchmarking -- intentionally vendored in-tree
 # (not FetchContent) so its numbers never shift under us. Not upstream-synced.
 
-add_library(liquibook_ref STATIC
-        src/simple_order.cpp
-)
+add_library(liquibook_ref STATIC src/simple_order.cpp)
+set_target_properties(liquibook_ref PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # PUBLIC: consumers need these headers to instantiate the templates.
 target_include_directories(liquibook_ref PUBLIC
