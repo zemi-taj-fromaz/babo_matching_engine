@@ -1,10 +1,11 @@
-#add_library(babobook_shared SHARED babobook_adapter.cpp)
-#target_link_libraries(babobook_shared PRIVATE babobook)
+add_library(babobook_adapter SHARED babobook_adapter.cpp)
+target_link_libraries(babobook_adapter PRIVATE babobook)
+set_target_properties(babobook_adapter PROPERTIES
+        WINDOWS_EXPORT_ALL_SYMBOLS ON
+        PREFIX ""
 
-add_library(liquibook_shared SHARED liquibook_adapter.cpp)
-target_link_libraries(liquibook_shared PRIVATE liquibook_ref)
-# On Windows, extern "C" fixes the symbol NAME but does not EXPORT it from the
-# DLL — GetProcAddress would find nothing. This auto-generates the export table
-# for all functions (the engine_* ABI), so the adapter loads without adding
-# __declspec(dllexport) to source written for Linux. No-op on Linux/.so.
-set_target_properties(liquibook_shared PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+add_library(liquibook_adapter SHARED liquibook_adapter.cpp)
+target_link_libraries(liquibook_adapter PRIVATE liquibook_ref)
+set_target_properties(liquibook_adapter PROPERTIES
+        WINDOWS_EXPORT_ALL_SYMBOLS ON
+        PREFIX "")   # no "lib" prefix, so --baseline finds liquibook_adapter.{dll,so}
