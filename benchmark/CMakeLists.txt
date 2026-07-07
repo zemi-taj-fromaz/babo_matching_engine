@@ -14,6 +14,10 @@ add_subdirectory(adapters)
 # Binary  data generator
 add_executable(generator workload/generator.cpp)
 target_include_directories(generator PRIVATE api)
+# Deterministic workload: pin bit-stable FP (no FMA contraction, no LTO) so
+# aggressive Release flags cannot change the generated stream and invalidate the
+# correctness references. Helper defined in cmake/CompilerSettings.cmake.
+target_deterministic_fp(generator)
 
 
 

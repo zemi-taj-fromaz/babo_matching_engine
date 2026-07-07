@@ -57,14 +57,9 @@ FetchContent_MakeAvailable(googletest)
 message(STATUS "PROJECT NAME  ${PROJECT_NAME}")
 message(STATUS "CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}")
 
-include(CheckIPOSupported)
-check_ipo_supported(RESULT IPO_SUPPORTED OUTPUT IPO_ERROR)
-
-if (IPO_SUPPORTED)
-    message(STATUS "IPO / LTO enabled")
-else ()
-    message(STATUS "IPO / LTO not supported: <${IPO_ERROR}>")
-endif ()
+# --- Compiler / optimization policy (all in cmake/CompilerSettings.cmake) ---
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(CompilerSettings)
 
 # --- Static libraries to compare ---
 # liquibook_ref: vendored reference engine (in-tree, frozen baseline).
