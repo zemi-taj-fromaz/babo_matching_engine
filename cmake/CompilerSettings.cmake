@@ -24,6 +24,17 @@ else ()
     message(STATUS "IPO / LTO not supported: <${IPO_ERROR}>")
 endif ()
 
+# --- MinGW: self-contained binaries ------------------------------------------
+# Statically link the gcc/libstdc++/winpthread runtime so harness.exe and the
+# adapter DLLs don't depend on MinGW runtime DLLs being on PATH. Without this,
+# the binaries only run from inside CLion (which injects its bundled MinGW's bin
+# onto PATH); with it they run from any shell and from the benchmark scripts.
+# Safe here because the harness<->adapter boundary is a pure C ABI — no C++
+# objects cross it, so each module carrying its own runtime copy is fine.
+if (MINGW)
+    add_link_options(-static-libgcc -static-libstdc++ -static)
+endif ()
+
 # --- Helper: pin a target to bit-stable floating-point -----------------------
 # Forbids FMA contraction and LTO on a target, so aggressive Release flags can
 # never shift a floating-point result by a ULP and silently change its output.

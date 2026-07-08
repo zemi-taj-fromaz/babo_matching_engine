@@ -73,9 +73,12 @@ try {
         return
     }
     foreach ($s in $scenarios) {
-        $out     = .\harness.exe --engine .\babobook_adapter.dll --scenario $s --count $Count --mode perf
-        $status  = (($out | Select-String "Status:")  -replace '.*Status:\s*','').Trim()
-        $verdict = (($out | Select-String "Verdict:") -replace '.*Verdict:\s*','').Trim()
+        # Merge to one string and take the FIRST match — the harness prints more
+        # than one line containing "Status:", so a per-line match returns an array
+        # (and .Trim() then fails). -match on the joined text picks the summary one.
+        $out     = (.\harness.exe --engine .\babobook_adapter.dll --scenario $s --count $Count --mode perf 2>$null | Out-String)
+        $status  = if ($out -match 'Status:\s*(\S+)')  { $Matches[1] } else { '?' }
+        $verdict = if ($out -match 'Verdict:\s*(\S+)') { $Matches[1] } else { '?' }
         $color   = if ($status -eq "PASS") { "Green" } else { "Red" }
         Write-Host ("  {0,-12} {1,-14} {2}" -f $s, $status, $verdict) -ForegroundColor $color
     }

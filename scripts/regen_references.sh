@@ -71,7 +71,7 @@ if [ -z "$BABO" ]; then echo "  (babobook adapter not built - skipping babo veri
 
 for s in "${SCENARIOS[@]}"; do
   out=$("$HARNESS" --engine "$BABO" --scenario "$s" --count "$COUNT" --mode perf 2>/dev/null)
-  status=$(printf '%s\n' "$out"  | grep -oE 'Status: *[A-Za-z_]+'  | awk '{print $NF}')
-  verdict=$(printf '%s\n' "$out" | grep -oE 'Verdict: *[A-Za-z]+' | awk '{print $NF}')
+  status=$(printf '%s\n' "$out"  | grep -oE 'Status: *[A-Za-z_]+'  | head -1 | awk '{print $NF}')
+  verdict=$(printf '%s\n' "$out" | grep -oE 'Verdict: *[A-Za-z]+' | head -1 | awk '{print $NF}')
   printf "  %-12s %-8s %s\n" "$s" "${status:-?}" "${verdict:-?}"
 done
