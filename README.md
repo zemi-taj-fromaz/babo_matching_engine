@@ -14,7 +14,7 @@ Linux, or macOS, in one run.
 | `libs/liquibook/` | the reference engine, vendored |
 | `benchmark/` | the plugin **harness**: replays a deterministic workload through a `dlopen`'d engine adapter and scores it (throughput + correctness + anti-cheat) |
 | `benchmark/adapters/` | `babobook_adapter` / `liquibook_adapter` — each engine wrapped behind `api/matching_engine_api.h` and built as a shared lib |
-| `src/` | standalone **per-operation latency + throughput** micro-benchmarks (core-pinned) |
+| `perf/` | standalone **hardware-counter, latency, and throughput** micro-benchmarks (core-pinned) |
 | `scripts/` | automation — regenerate references, compare engines |
 | `test/` | unit tests (`babo_test`, `liqui_test`) |
 
@@ -161,21 +161,20 @@ The harness has **no latency mode** — its speed metric is throughput, and for 
 single-threaded engine **median latency ≈ 1 / throughput** (e.g. 4.66 M msgs/s ⇒
 ~215 ns/message). The report-stream transport also perturbs per-message timing,
 so a clean tail-latency histogram is measured **separately**, by the standalone,
-core-pinned micro-benchmarks in **`src/`**:
+core-pinned micro-benchmarks in **`perf/`**:
 
 | Executable | Measures |
 |---|---|
 | `babo_latency` / `liqui_latency` | per-operation latency (ns), with percentiles |
-| `babo_perf` / `liqui_perf` | raw inserts/sec throughput |
-| `workload_stats` | validates the generated workload's statistics vs the paper |
+| `babo_perf` / `liqui_perf` | long deterministic replay suitable for hardware-counter profiling; also prints raw throughput |
 
 These link the engine **directly** (no adapter / no shared-lib boundary) and pin
 to an isolated core, so the numbers are per-order latencies rather than harness
-throughput. Build and run them from the `src/` targets:
+throughput. Build and run them from the `perf/` targets:
 
 ```bash
 cmake --build cmake-build-release --target babo_latency liqui_latency
-./cmake-build-release/src/babo_latency
+./cmake-build-release/perf/babo_latency
 ```
 
 ---
@@ -186,7 +185,7 @@ cmake --build cmake-build-release --target babo_latency liqui_latency
 2. **`regen_references`** `--bench-dir <build>/benchmark` — references + babo verification.
 3. **`compare_engines`** `--engine adapters/babobook_adapter.<ext> --bench-dir <build>/benchmark` — throughput table + CSV + Markdown.
 4. **Audit** (manual, once per engine): `harness --engine ./babobook_adapter.<ext> --mode audit`.
-5. **Latency** (separate binaries): `src/babo_latency`, `src/liqui_latency`.
+5. **Latency / hardware counters** (separate binaries): `perf/babo_latency`, `perf/babo_perf`, `perf/liqui_latency`, `perf/liqui_perf`.
 
 Steps 2–3 are fully automated by the two scripts; steps 4–5 are the intentionally
 separate certification and micro-latency passes.
