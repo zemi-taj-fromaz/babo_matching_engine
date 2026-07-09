@@ -1,151 +1,103 @@
-// Throughput benchmark for the babo matching engine -- the counterpart to
-// liqui_perf_order_book.cpp, using the same workload, timing, and reporting so
-// the two engines can be compared head-to-head.
+// babo_perf_order_book.cpp — throughput micro-benchmark for babo's matching_book.
 //
-// babo differs from liquibook in two API-level ways that this harness accounts
-// for: matching_book::add() takes a SimpleOrder BY VALUE (so orders live in a
-// pre-built vector, not an array of pointers), and narb_tree has no size(), so
-// resting orders are counted by iteration. babo always tracks depth, so only the
-// depth-5 and BBO-1 configurations exist (no "no depth" variant).
-// --- CPU core isolation -----------------------------------------------------
-// Pin this thread to a single core so its per-core L1/L2 caches stay warm for
-// the whole run (the OS never migrates it to a cold core). Windows + Linux.
-// Affinity only; keeping *other* work off the core additionally needs OS setup
-// (Linux boot: isolcpus=<n> nohz_full=<n>, or raising thread priority).
-#if defined(__linux__) && !defined(_GNU_SOURCE)
-#  define _GNU_SOURCE            // sched_setaffinity / CPU_SET live behind this
-#endif
-#if defined(_WIN32)
-#  define WIN32_LEAN_AND_MEAN
-#  define NOMINMAX               // keep <windows.h> from clobbering std::min/max
-#  include <windows.h>
-static bool pin_to_core(unsigned core) {
-  return SetThreadAffinityMask(GetCurrentThread(), (DWORD_PTR)1 << core) != 0;
-}
-// Windows has no isolcpus equivalent, so raising priority IS the programmatic
-// "isolation": this thread preempts other normal work the scheduler may still
-// place on the pinned core. TIME_CRITICAL is aggressive but recoverable;
-// REALTIME_PRIORITY_CLASS (commented) needs admin and can wedge the machine if
-// the thread ever busy-waits.
-static bool isolate_core() {
-  // SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
-  return SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL) != 0;
-}
-#else
-#  include <sched.h>
-static bool pin_to_core(unsigned core) {
-  cpu_set_t set; CPU_ZERO(&set); CPU_SET(core, &set);
-  return sched_setaffinity(0, sizeof(set), &set) == 0;   // 0 == calling thread
-}
-// Programmatic isolation on Linux is real-time scheduling: SCHED_FIFO preempts
-// all normal (SCHED_OTHER) tasks on the core. Needs CAP_SYS_NICE/root; returns
-// false otherwise. NOTE: isolcpus / nohz_full are BOOT parameters -- they cannot
-// be set from within the process; this is the runtime approximation of them.
-static bool isolate_core() {
-  struct sched_param sp;
-  sp.sched_priority = sched_get_priority_max(SCHED_FIFO) - 1;
-  return sched_setscheduler(0, SCHED_FIFO, &sp) == 0;
-}
-#endif
-static constexpr unsigned kBenchCore = 2;   // change to a free physical core
+// Replays a generator .bin workload through the engine with a NO-OP listener (no
+// report emission), so the measured time is the matching core alone — the tool
+// for profiling the data structure / template params under perf/uProf. Core-
+// pinned, with a warmup pass. Counterpart: liqui_perf_order_book.cpp.
+//
+//   babo_perf <workload.bin>
+//
+#include "bench/bench_util.h"
+#include "bench/workload_reader.h"
 
 #include <book/matching_book.h>
 #include <simple/simple_order.h>
 
 #include <chrono>
-#include <iostream>
 #include <cstdint>
-#include <cstdlib>
+#include <cstdio>
 #include <vector>
 
-using babo::simple::SimpleOrder;
+namespace bk = babo::book;
+using Order  = babo::simple::SimpleOrder;
+using Book   = bk::matching_book<5>;           // canonical depth (matches the adapter)
+using clk    = std::chrono::steady_clock;
 
-using clock_type = std::chrono::steady_clock;
+static constexpr unsigned kBenchCore = 2;      // change to a free physical core
 
-typedef babo::book::matching_book<5> FullDepthOrderBook;
-typedef babo::book::matching_book<1> BboOrderBook;
+namespace {
 
-// Count orders still resting in the book (babo has no O(1) size()).
-template <class Book>
-uint32_t resting_count(Book& book) {
-  uint32_t n = 0;
-  for (auto it = book.bids().orders_begin(); it != book.bids().orders_end(); ++it) ++n;
-  for (auto it = book.asks().orders_begin(); it != book.asks().orders_end(); ++it) ++n;
-  return n;
+// Matching runs; reports don't. Isolates the data structure from report cost.
+struct NoopListener : bk::OrderListener<std::uint32_t> {
+    void on_fill(const std::uint32_t&, const std::uint32_t&, std::uint32_t, std::uint32_t) override {}
+    void on_accept(const std::uint32_t&) override {}
+    void on_reject(const std::uint32_t&, const char*) override {}
+    void on_cancel(const std::uint32_t&) override {}
+    void on_cancel_reject(const std::uint32_t&, const char*) override {}
+    void on_replace(const std::uint32_t&, const std::int32_t&, std::uint32_t) override {}
+    void on_replace_reject(const std::uint32_t&, const char*) override {}
+};
+
+inline Order* find_resting(Book& b, std::uint32_t id) {
+    if (Order* o = b.bids().find_order(id)) return o;
+    if (Order* o = b.asks().find_order(id)) return o;
+    return nullptr;
 }
 
-// Add orders until the deadline. Returns the number added, or -1 if the pre-built
-// order set was exhausted before the window elapsed.
-template <class Book>
-int run_test(Book& book, std::vector<SimpleOrder>& orders, clock_type::time_point end) {
-  int count = 0;
-  const size_t n = orders.size();
-  for (size_t i = 0; i < n; ++i) {
-    book.add(orders[i]);           // by value (babo copies into the book)
-    ++count;
-    if (clock_type::now() >= end) return count;
-  }
-  return -1;   // ran out of orders before time was up
+// Dispatch one message. babo is id-based, so cancel/modify need no id->pointer map;
+// the guard matches the adapter (a duplicate/stale cancel of a gone order is a no-op).
+inline void dispatch(Book& book, const bench::WMsg& m) {
+    const std::uint32_t id = std::uint32_t(m.order_id);
+    if (m.type == 0) {                                   // NEW
+        Order o(m.side == 0, std::uint32_t(m.price), m.qty, 0,
+                m.ioc ? bk::oc_immediate_or_cancel : bk::oc_no_conditions);
+        o.order_id_ = id;
+        book.add(o);                                     // by value: babo copies into its pool
+    } else if (m.type == 1) {                            // CANCEL
+        if (find_resting(book, id)) book.cancel(id);
+    } else {                                             // MODIFY = cancel + reinsert
+        if (find_resting(book, id)) {
+            book.cancel(id);
+            Order n(m.side == 0, std::uint32_t(m.price), m.qty);
+            n.order_id_ = id;
+            book.add(n);
+        }
+    }
 }
 
-template <class Book>
-bool build_and_run_test(uint32_t dur_sec, uint32_t num_to_try) {
-  std::cout << "trying run of " << num_to_try << " orders";
-  Book book;
-  std::vector<SimpleOrder> orders;
-  orders.reserve(num_to_try);
-
-  for (uint32_t i = 0; i < num_to_try; ++i) {
-    bool is_buy((i % 2) == 0);
-    uint32_t delta = is_buy ? 1880 : 1884;   // overlapping bands -> many orders cross
-    uint32_t price = (rand() % 10) + delta;
-    uint32_t qty = ((rand() % 10) + 1) * 100;
-    orders.emplace_back(is_buy, price, qty);
-  }
-
-  clock_type::time_point start = clock_type::now();
-  clock_type::time_point stop  = start + std::chrono::seconds(dur_sec);
-
-  int count = run_test(book, orders, stop);
-
-  if (count > 0) {
-    std::cout << " - complete!" << std::endl;
-    std::cout << "Inserted " << count << " orders in " << dur_sec << " seconds"
-              << ", or " << count / dur_sec << " insertions per sec" << std::endl;
-    uint32_t remain = resting_count(book);
-    std::cout << "Run matched " << count - int(remain) << " orders" << std::endl;
-    return true;
-  }
-  std::cout << " - not enough orders" << std::endl;
-  return false;
+// Count still-resting orders — a sink so the optimizer can't drop the replay.
+std::uint32_t resting_count(Book& book) {
+    std::uint32_t n = 0;
+    for (auto it = book.bids().orders_begin(); it != book.bids().orders_end(); ++it) ++n;
+    for (auto it = book.asks().orders_begin(); it != book.asks().orders_end(); ++it) ++n;
+    return n;
 }
 
-int main(int argc, const char* argv[]) {
-  if (pin_to_core(kBenchCore))
-    std::cerr << "pinned to CPU core " << kBenchCore << std::endl;
-  else
-    std::cerr << "warning: could not pin to CPU core " << kBenchCore << std::endl;
-  if (isolate_core())
-    std::cerr << "raised to real-time priority (isolating the core)" << std::endl;
-  else
-    std::cerr << "warning: could not raise priority (need admin/root?)" << std::endl;
+// One full replay on a fresh book. Returns seconds; writes the resting-count sink.
+double replay_timed(const std::vector<bench::WMsg>& w, std::uint32_t& sink) {
+    Book book; NoopListener nl; book.set_order_listener(&nl);
+    const auto t0 = clk::now();
+    for (const auto& m : w) dispatch(book, m);
+    const auto t1 = clk::now();
+    sink = resting_count(book);
+    return std::chrono::duration<double>(t1 - t0).count();
+}
 
-  uint32_t dur_sec = 3;
-  if (argc > 1) {
-    dur_sec = atoi(argv[1]);
-    if (!dur_sec) dur_sec = 3;
-  }
-  std::cout << dur_sec << " sec performance test of babo order book" << std::endl;
-  srand(dur_sec);
+}  // namespace
 
-  {
-    std::cout << "testing order book with depth" << std::endl;
-    uint32_t num_to_try = dur_sec * 125000;
-    while (!build_and_run_test<FullDepthOrderBook>(dur_sec, num_to_try)) num_to_try *= 2;
-  }
-  {
-    std::cout << "testing order book with bbo" << std::endl;
-    uint32_t num_to_try = dur_sec * 125000;
-    while (!build_and_run_test<BboOrderBook>(dur_sec, num_to_try)) num_to_try *= 2;
-  }
+int main(int argc, char** argv) {
+    bench::pin_and_isolate(kBenchCore);
+
+    const char* path = (argc > 1) ? argv[1] : "orders_normal_s23_n1000000.bin";
+    std::vector<bench::WMsg> w;
+    if (!bench::load_workload(path, w)) return 1;
+    std::printf("babo perf: %zu messages from %s\n", w.size(), path);
+
+    std::uint32_t sink = 0;
+    replay_timed(w, sink);                      // warmup (warms code / branch predictor)
+    const double sec = replay_timed(w, sink);   // measured
+
+    bench::report_throughput(w.size(), sec);
+    std::printf("  resting    : %u  (sink)\n", sink);
+    return 0;
 }

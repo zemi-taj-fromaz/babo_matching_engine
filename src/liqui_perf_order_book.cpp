@@ -1,155 +1,119 @@
-// Throughput benchmark for the liquibook reference engine.
-// Ported from liquibook's src/perf_order_book.cpp. Behaviour is unchanged except
-// the duration clock: std::chrono::steady_clock (monotonic, portable) replaces
-// clock(), so this and the babo throughput bench measure the same way.
+// liqui_perf_order_book.cpp — throughput micro-benchmark for liquibook.
 //
-// It streams pre-built, frequently-crossing buy/sell orders into the book for a
-// fixed wall-clock window and reports insertions/sec and how many were matched.
-// Three book configurations are compared: full depth (5 levels), BBO (1 level),
-// and no depth tracking.
-// --- CPU core isolation -----------------------------------------------------
-// Pin this thread to a single core so its per-core L1/L2 caches stay warm for
-// the whole run (the OS never migrates it to a cold core). Windows + Linux.
-// Affinity only; keeping *other* work off the core additionally needs OS setup
-// (Linux boot: isolcpus=<n> nohz_full=<n>, or raising thread priority).
-#if defined(__linux__) && !defined(_GNU_SOURCE)
-#  define _GNU_SOURCE            // sched_setaffinity / CPU_SET live behind this
-#endif
-#if defined(_WIN32)
-#  define WIN32_LEAN_AND_MEAN
-#  define NOMINMAX               // keep <windows.h> from clobbering std::min/max
-#  include <windows.h>
-static bool pin_to_core(unsigned core) {
-  return SetThreadAffinityMask(GetCurrentThread(), (DWORD_PTR)1 << core) != 0;
-}
-// Windows has no isolcpus equivalent, so raising priority IS the programmatic
-// "isolation": this thread preempts other normal work the scheduler may still
-// place on the pinned core. TIME_CRITICAL is aggressive but recoverable;
-// REALTIME_PRIORITY_CLASS (commented) needs admin and can wedge the machine if
-// the thread ever busy-waits.
-static bool isolate_core() {
-  // SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
-  return SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL) != 0;
-}
-#else
-#  include <sched.h>
-static bool pin_to_core(unsigned core) {
-  cpu_set_t set; CPU_ZERO(&set); CPU_SET(core, &set);
-  return sched_setaffinity(0, sizeof(set), &set) == 0;   // 0 == calling thread
-}
-// Programmatic isolation on Linux is real-time scheduling: SCHED_FIFO preempts
-// all normal (SCHED_OTHER) tasks on the core. Needs CAP_SYS_NICE/root; returns
-// false otherwise. NOTE: isolcpus / nohz_full are BOOT parameters -- they cannot
-// be set from within the process; this is the runtime approximation of them.
-static bool isolate_core() {
-  struct sched_param sp;
-  sp.sched_priority = sched_get_priority_max(SCHED_FIFO) - 1;
-  return sched_setscheduler(0, SCHED_FIFO, &sp) == 0;
-}
-#endif
-static constexpr unsigned kBenchCore = 2;   // change to a free physical core
+// Same protocol as babo_perf: replay a generator .bin with a NO-OP listener and
+// time the matching core alone. Liquibook cancels by POINTER, so this keeps an
+// id->LO* map (pre-sized off the clock). Order allocation stays inside the timed
+// loop, as it does in production — that heap cost is part of what the comparison
+// measures. Counterpart: babo_perf_order_book.cpp.
+//
+//   liqui_perf <workload.bin>
+//
+#include "bench/bench_util.h"
+#include "bench/workload_reader.h"
 
+#include <simple/simple_order.h>
 #include <simple/simple_order_book.h>
-#include <book/types.h>
 
 #include <chrono>
-#include <iostream>
 #include <cstdint>
-#include <cstdlib>
+#include <cstdio>
+#include <vector>
 
-using namespace liquibook;
-using namespace liquibook::book;
+namespace lb = liquibook::book;
+using LO   = liquibook::simple::SimpleOrder;
+using Book = liquibook::simple::SimpleOrderBook<5>;
+using liquibook::simple::os_accepted;
+using clk  = std::chrono::steady_clock;
 
-typedef simple::SimpleOrderBook<5>            FullDepthOrderBook;
-typedef simple::SimpleOrderBook<1>            BboOrderBook;
-typedef book::OrderBook<simple::SimpleOrder*> NoDepthOrderBook;
+static constexpr unsigned kBenchCore = 2;
 
-using clock_type = std::chrono::steady_clock;
+namespace {
 
-// Add orders until the deadline. Returns the number added, or -1 if the
-// pre-built order array was exhausted before the window elapsed.
-template <class TypedOrderBook, class TypedOrder>
-int run_test(TypedOrderBook& order_book, TypedOrder** orders, clock_type::time_point end) {
-  int count = 0;
-  TypedOrder** pp_order = orders;
-  do {
-    order_book.add(*pp_order);
-    ++pp_order;
-    if (*pp_order == nullptr) {
-      return -1;   // ran out of orders before time was up
+struct NoopListener : lb::OrderListener<LO*> {
+    void on_accept(LO* const&) override {}
+    void on_fill(LO* const&, LO* const&, lb::Quantity, lb::Cost) override {}
+    void on_cancel(LO* const&) override {}
+    void on_replace(LO* const&, const std::int32_t&, lb::Price) override {}
+    void on_reject(LO* const&, const char*) override {}
+    void on_cancel_reject(LO* const&, const char*) override {}
+    void on_replace_reject(LO* const&, const char*) override {}
+};
+
+inline bool resting(LO* lo) {
+    return lo && lo->state() == os_accepted && lo->open_qty() > 0;
+}
+
+std::size_t max_order_id(const std::vector<bench::WMsg>& w) {
+    std::size_t m = 0;
+    for (const auto& x : w) if (std::size_t(x.order_id) > m) m = std::size_t(x.order_id);
+    return m;
+}
+
+// One full replay on a fresh book. `orders` (id->LO*) is sized off the clock; the
+// LO allocations are on the clock (liquibook needs heap order nodes). Every LO is
+// recorded in `allocated` for cleanup after timing.
+double replay_timed(const std::vector<bench::WMsg>& w, std::size_t max_id,
+                    std::vector<LO*>& allocated, std::uint32_t& sink) {
+    Book book; NoopListener nl; book.set_order_listener(&nl);
+    std::vector<LO*> orders(max_id + 1, nullptr);      // off the clock
+
+    const auto t0 = clk::now();
+    for (const auto& m : w) {
+        const std::uint32_t id = std::uint32_t(m.order_id);
+        if (m.type == 0) {                                          // NEW
+            const lb::OrderConditions c =
+                m.ioc ? lb::oc_immediate_or_cancel : lb::oc_no_conditions;
+            LO* lo = new LO(m.side == 0, lb::Price(m.price), lb::Quantity(m.qty), 0, c);
+            allocated.push_back(lo);
+            orders[id] = lo;
+            book.add(lo, c);
+        } else if (m.type == 1) {                                  // CANCEL
+            LO* lo = orders[id];
+            if (resting(lo)) book.cancel(lo);
+        } else {                                                   // MODIFY = cancel + reinsert
+            LO* lo = orders[id];
+            if (resting(lo)) {
+                book.cancel(lo);
+                LO* n = new LO(m.side == 0, lb::Price(m.price), lb::Quantity(m.qty),
+                               0, lb::oc_no_conditions);
+                allocated.push_back(n);
+                orders[id] = n;
+                book.add(n, lb::oc_no_conditions);
+            }
+        }
     }
-    ++count;
-  } while (clock_type::now() < end);
-  return int(pp_order - orders);
+    const auto t1 = clk::now();
+
+    std::uint32_t n = 0;
+    for (LO* lo : allocated) if (resting(lo)) ++n;      // sink
+    sink = n;
+    return std::chrono::duration<double>(t1 - t0).count();
 }
 
-template <class TypedOrderBook>
-bool build_and_run_test(uint32_t dur_sec, uint32_t num_to_try) {
-  std::cout << "trying run of " << num_to_try << " orders";
-  TypedOrderBook order_book;
-  simple::SimpleOrder** orders = new simple::SimpleOrder*[num_to_try + 1];
+}  // namespace
 
-  for (uint32_t i = 0; i <= num_to_try; ++i) {
-    bool is_buy((i % 2) == 0);
-    uint32_t delta = is_buy ? 1880 : 1884;   // overlapping bands -> many orders cross
-    Price price = (rand() % 10) + delta;
-    Quantity qty = ((rand() % 10) + 1) * 100;
-    orders[i] = new simple::SimpleOrder(is_buy, price, qty);
-  }
-  orders[num_to_try] = nullptr;   // sentinel
+int main(int argc, char** argv) {
+    bench::pin_and_isolate(kBenchCore);
 
-  clock_type::time_point start = clock_type::now();
-  clock_type::time_point stop  = start + std::chrono::seconds(dur_sec);
+    const char* path = (argc > 1) ? argv[1] : "orders_normal_s23_n1000000.bin";
+    std::vector<bench::WMsg> w;
+    if (!bench::load_workload(path, w)) return 1;
+    std::printf("liquibook perf: %zu messages from %s\n", w.size(), path);
 
-  int count = run_test(order_book, orders, stop);
-  for (uint32_t i = 0; i <= num_to_try; ++i) {
-    delete orders[i];
-  }
-  delete [] orders;
+    const std::size_t max_id = max_order_id(w);
+    std::uint32_t sink = 0;
 
-  if (count > 0) {
-    std::cout << " - complete!" << std::endl;
-    std::cout << "Inserted " << count << " orders in " << dur_sec << " seconds"
-              << ", or " << count / dur_sec << " insertions per sec" << std::endl;
-    uint32_t remain = uint32_t(order_book.bids().size() + order_book.asks().size());
-    std::cout << "Run matched " << count - remain << " orders" << std::endl;
-    return true;
-  }
-  std::cout << " - not enough orders" << std::endl;
-  return false;
-}
+    {   // warmup (warms code / branch predictor), then free the orders it built
+        std::vector<LO*> warm; warm.reserve(w.size());
+        replay_timed(w, max_id, warm, sink);
+        for (LO* lo : warm) delete lo;
+    }
 
-int main(int argc, const char* argv[]) {
-  if (pin_to_core(kBenchCore))
-    std::cerr << "pinned to CPU core " << kBenchCore << std::endl;
-  else
-    std::cerr << "warning: could not pin to CPU core " << kBenchCore << std::endl;
-  if (isolate_core())
-    std::cerr << "raised to real-time priority (isolating the core)" << std::endl;
-  else
-    std::cerr << "warning: could not raise priority (need admin/root?)" << std::endl;
+    std::vector<LO*> allocated; allocated.reserve(w.size());
+    const double sec = replay_timed(w, max_id, allocated, sink);   // measured
 
-  uint32_t dur_sec = 3;
-  if (argc > 1) {
-    dur_sec = atoi(argv[1]);
-    if (!dur_sec) dur_sec = 3;
-  }
-  std::cout << dur_sec << " sec performance test of liquibook order book" << std::endl;
-  srand(dur_sec);
-
-  {
-    std::cout << "testing order book with depth" << std::endl;
-    uint32_t num_to_try = dur_sec * 125000;
-    while (!build_and_run_test<FullDepthOrderBook>(dur_sec, num_to_try)) num_to_try *= 2;
-  }
-  {
-    std::cout << "testing order book with bbo" << std::endl;
-    uint32_t num_to_try = dur_sec * 125000;
-    while (!build_and_run_test<BboOrderBook>(dur_sec, num_to_try)) num_to_try *= 2;
-  }
-  {
-    std::cout << "testing order book without depth" << std::endl;
-    uint32_t num_to_try = dur_sec * 125000;
-    while (!build_and_run_test<NoDepthOrderBook>(dur_sec, num_to_try)) num_to_try *= 2;
-  }
+    bench::report_throughput(w.size(), sec);
+    std::printf("  resting    : %u  (sink)\n", sink);
+    for (LO* lo : allocated) delete lo;
+    return 0;
 }
