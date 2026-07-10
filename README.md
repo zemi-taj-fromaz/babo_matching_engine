@@ -27,8 +27,9 @@ difference made visible.
 ## Quick start
 
 **Prereqs:** CMake ≥ 3.23, a C++20 compiler (MSVC 19.3+, clang 14+, or gcc 11+),
-and internet on the *first* configure (CMake fetches googletest, spdlog, and
-SPSCQueue).
+and internet on the *first* configure (CMake fetches googletest and SPSCQueue).
+No other dependencies — the perf binaries' colored output is a self-contained
+header.
 
 ```bash
 # 1. configure (Release is required for meaningful numbers)

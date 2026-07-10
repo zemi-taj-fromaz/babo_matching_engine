@@ -188,6 +188,7 @@ int main(int argc, char** argv) {
     }
 
     bench::log::banner(kEngineName, kDepthOn, kBenchCore, options.reps);
+    bench::log::note("pin_node capacity: " + std::to_string(babo::kNodeCapacity));
     bench::log::pin_and_isolate(kBenchCore);
 
     if (options.workload_path) {

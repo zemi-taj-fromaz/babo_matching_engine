@@ -18,8 +18,8 @@ current state.
 
 ## Build
 
-C++20, CMake ≥ 3.23, GoogleTest + spdlog + rigtorp/SPSCQueue pulled via
-`FetchContent`. Release is required for meaningful numbers.
+C++20, CMake ≥ 3.23, GoogleTest + rigtorp/SPSCQueue pulled via `FetchContent`.
+Release is required for meaningful numbers.
 
 ```bash
 cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
@@ -31,8 +31,8 @@ cmake --build cmake-build-release --target harness generator liquibook_adapter b
 Depth is a **compile-time toggle** (`BABO_NO_DEPTH` / `LIQUI_NO_DEPTH`), so each
 engine ships two adapters and two perf binaries from one source: `*_adapter` /
 `*_perf` are depth-OFF (lean, the fair head-to-head), `*_depth_adapter` /
-`*_depth_perf` are depth-ON. spdlog is FetchContent'd and used only by the perf
-binaries for clean colored output (`perf/bench_log.h`).
+`*_depth_perf` are depth-ON. The perf binaries print via a dependency-free
+ANSI-color header (`perf/bench_log.h`) — no spdlog.
 
 - On Windows with the LLVM/clang toolchain, add
   `-DCMAKE_RC_COMPILER="C:/Program Files/LLVM/bin/llvm-rc.exe"`.
@@ -78,7 +78,7 @@ identical behavior; both take the build's **benchmark dir** as an argument.
 intentionally *not* scripted — see README. Audit is a once-per-engine pass/fail
 certification. The four standalone core-pinned `perf/` binaries (`babo_perf`,
 `babo_depth_perf`, `liqui_perf`, `liqui_depth_perf`) link the engine directly with
-no adapter/shared-lib boundary and report throughput via spdlog; they are the
+no adapter/shared-lib boundary and print a colored throughput report; they are the
 depth-on/off comparison and the target for hardware-counter profiling.
 
 ## Architecture

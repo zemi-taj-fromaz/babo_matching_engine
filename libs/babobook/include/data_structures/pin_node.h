@@ -15,8 +15,14 @@
 
 namespace babo {
 
-// Fixed compile-time capacity of a PIN node (orders per node). Single global value for now.
-inline constexpr std::uint16_t kNodeCapacity = 64;
+// Fixed compile-time capacity of a PIN node (orders per node). Override at build
+// time with -DBABO_PIN_CAPACITY=N (e.g. 16/32/64/128) to sweep it -- larger nodes
+// pack more orders per cache-contiguous block (fewer node allocations / chain hops)
+// at the cost of a bigger, sparser node when levels are thin. Default 64.
+#ifndef BABO_PIN_CAPACITY
+#define BABO_PIN_CAPACITY 64
+#endif
+inline constexpr std::uint16_t kNodeCapacity = BABO_PIN_CAPACITY;
 
 // A Priority-Indicated Node (PIN): a fixed-capacity (N) inline slot region holding up to N
 // orders, ordered by intrusive prev/next slot links (head = highest priority, tail = lowest).

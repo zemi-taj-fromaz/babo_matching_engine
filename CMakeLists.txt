@@ -24,14 +24,6 @@ FetchContent_Declare(
 #set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-# spdlog — clean, colored console output for the standalone perf executables.
-FetchContent_Declare(
-        spdlog
-        GIT_REPOSITORY https://github.com/gabime/spdlog.git
-        GIT_TAG v1.14.1
-)
-FetchContent_MakeAvailable(spdlog)
-
 message(STATUS "PROJECT NAME  ${PROJECT_NAME}")
 message(STATUS "CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}")
 
