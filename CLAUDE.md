@@ -23,8 +23,16 @@ C++20, CMake ≥ 3.23, GoogleTest + spdlog + rigtorp/SPSCQueue pulled via
 
 ```bash
 cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build cmake-build-release -j            # builds everything
+# or a subset:
 cmake --build cmake-build-release --target harness generator liquibook_adapter babobook_adapter
 ```
+
+Depth is a **compile-time toggle** (`BABO_NO_DEPTH` / `LIQUI_NO_DEPTH`), so each
+engine ships two adapters and two perf binaries from one source: `*_adapter` /
+`*_perf` are depth-OFF (lean, the fair head-to-head), `*_depth_adapter` /
+`*_depth_perf` are depth-ON. spdlog is FetchContent'd and used only by the perf
+binaries for clean colored output (`perf/bench_log.h`).
 
 - On Windows with the LLVM/clang toolchain, add
   `-DCMAKE_RC_COMPILER="C:/Program Files/LLVM/bin/llvm-rc.exe"`.
@@ -66,12 +74,12 @@ identical behavior; both take the build's **benchmark dir** as an argument.
    the liquibook baseline (best of N reps), emit a console table + CSV + Markdown
    under `<benchmark>/results/`. Runs `--mode perf` only.
 
-**Audit** (`--mode audit`) and **latency/hardware-counter** micro-benchmarks are
+**Audit** (`--mode audit`) and the **perf/hardware-counter** micro-benchmarks are
 intentionally *not* scripted — see README. Audit is a once-per-engine pass/fail
-certification; latency is measured by the standalone core-pinned `perf/` binaries
-(`babo_perf`, `liqui_perf`), which link the engine directly with no adapter/shared-lib
-boundary. (README's `*_latency` names refer to what those `*_perf` binaries report,
-not separate targets.)
+certification. The four standalone core-pinned `perf/` binaries (`babo_perf`,
+`babo_depth_perf`, `liqui_perf`, `liqui_depth_perf`) link the engine directly with
+no adapter/shared-lib boundary and report throughput via spdlog; they are the
+depth-on/off comparison and the target for hardware-counter profiling.
 
 ## Architecture
 
@@ -87,6 +95,10 @@ Three layers, decoupled by the C ABI:
   `engine_query_*`). Optional exports: `engine_get_transport`, `engine_prebuild`,
   `engine_on_batch` — read the header comments before implementing these, they carry
   strict anti-cheat contracts. `template_adapter.h.cpp` is the starting skeleton.
+  Built twice each (depth on/off): `{babobook,liquibook}_adapter` are depth-off,
+  `{babobook,liquibook}_depth_adapter` depth-on. `liqui_book_type.h` selects the
+  liquibook book type (`SimpleOrderBook` vs a depth-free `NoDepthBook`) and is
+  shared with `liqui_perf`.
 - **Harness** (`benchmark/src/`): `dlopen`s an adapter, replays a deterministic
   workload, drains the engine's report stream over an SPSC transport on an adjacent
   core, hashes it (`third_party/sha256.c`), and compares to the reference. Reports
@@ -99,8 +111,11 @@ Three layers, decoupled by the C ABI:
   book **owns nothing**; the `narb_tree`s own all resting/parked orders by value and
   the application interacts purely by order id. Handles new/cancel/replace/market-price,
   IOC, AON, and stop orders (parked in separate `narb_tree`s keyed by stop price).
-  Emits an inline lock-free trade ring plus the full listener set (order/trade/
-  book-change/depth/bbo), mirroring liquibook's `DepthOrderBook` surface but id-based.
+  Emits an inline lock-free trade ring plus the order/trade/book-change listeners.
+  Depth is **pull-based**: `depth()` (compiled out under `BABO_NO_DEPTH`) derives the
+  top-SIZE aggregate on demand by walking the tree's best-first level threads and
+  reading each `price_level_descriptor`'s `_quantity`/`_count` — nothing on the hot
+  path. (The old eager `Depth` + `std::map` excess tracker was removed.)
 - `data_structures/narb_tree.h` — per-side price-level tree with a threaded
   (pred/succ) bidirectional best-first iterator; templated on `order_type::{BID,ASK}`.
 - `data_structures/pin_node.h` — Priority-Indicated Node: fixed-capacity inline slot
@@ -108,7 +123,8 @@ Three layers, decoupled by the C ABI:
   the cache-aware structure that gives babo its O(1) cancel (vs liquibook's O(n)
   `find_on_market` scan — the source of the `static`-scenario speedup).
 - `memory/memory_pool.h`, `simple/simple_order.h`, `book/depth.h` — arena, order
-  value type, and aggregate top-of-book depth tracker.
+  value type, and a passive top-of-book depth **snapshot** (filled by the walk in
+  `matching_book::depth()`; no per-op maintenance).
 
 ### Key contract invariants (from `matching_engine_api.h`)
 

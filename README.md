@@ -1,191 +1,232 @@
 # babo_matching_engine
 
-`babo` is an O(1)-cancel limit-order-book matching engine. This repo benchmarks it
-head-to-head against [liquibook](https://github.com/enewhuis/liquibook) (the
-reference engine) under a single **C-ABI plugin contract**, so any challenger
-engine can be dropped in and measured under identical conditions — on Windows,
-Linux, or macOS, in one run.
+`babo` is an **O(1)-cancel** limit-order-book matching engine, benchmarked
+head-to-head against [liquibook](https://github.com/enewhuis/liquibook) (a
+well-known reference engine) under a single **C-ABI plugin contract** — so both
+engines are driven by identical inputs and scored on identical outputs, on
+Windows, Linux, or macOS, in one run.
 
-## Layout
+Scored three ways: **throughput**, **correctness** (SHA-256 of the report stream
+must match a reference), and an **anti-cheat state audit**.
 
-| Path | What |
-|---|---|
-| `libs/babobook/` | the babo engine (`matching_book<SIZE, TRADE_CAP>`) |
-| `libs/liquibook/` | the reference engine, vendored |
-| `benchmark/` | the plugin **harness**: replays a deterministic workload through a `dlopen`'d engine adapter and scores it (throughput + correctness + anti-cheat) |
-| `benchmark/adapters/` | `babobook_adapter` / `liquibook_adapter` — each engine wrapped behind `api/matching_engine_api.h` and built as a shared lib |
-| `perf/` | standalone **hardware-counter, latency, and throughput** micro-benchmarks (core-pinned) |
-| `scripts/` | automation — regenerate references, compare engines |
-| `test/` | unit tests (`babo_test`, `liqui_test`) |
+### Headline result
 
-## How the harness works
+| Scenario | liquibook | babo | Speedup |
+|---|---|---|---|
+| static | 1.9 | 6.1 | **~3×** (grows with book depth) |
+| normal | 3.8 | 4.7 | ~1.2× |
+| swing-25 | 2.5 | 4.9 | ~2× |
 
-The engine is compiled into a shared library that exports the C functions in
-`benchmark/api/matching_engine_api.h` (`engine_init`, `engine_on_new_order`, …).
-The harness `dlopen`s it, replays a deterministic workload one message at a time,
-and the engine emits its own report stream (acks + trades) over a lock-free
-transport drained on an adjacent core. The harness hashes that stream (SHA-256)
-and compares it to a published **reference hash**.
-
-Two run modes (`--mode`):
-
-- **`perf`** *(default)* — the measured run. Times the workload and reports
-  **throughput**; verifies the output hash for correctness.
-- **`audit`** — the **anti-cheat** run (not timed). See [Audit](#audit-anti-cheat).
-
-Five **scenarios** model different market regimes, driven by the paper's workload
-(power-law depth β=2.23 + GBM mid-price): `static`, `normal`, `swing-25`,
-`swing-40`, `flash-crash`.
-
-## Build
-
-Configure a build dir (Release for real numbers) and build the four benchmark
-targets. On Windows with the LLVM/clang toolchain, keep
-`-DCMAKE_RC_COMPILER="C:/Program Files/LLVM/bin/llvm-rc.exe"`.
-
-```bash
-cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
-cmake --build cmake-build-release --target harness generator liquibook_adapter babobook_adapter
-```
-
-Everything below refers to the build's **benchmark dir**:
-`<build-dir>/benchmark` (e.g. `cmake-build-release-system/benchmark`).
+*M msgs/s, 1M-message workload.* The mechanism: liquibook cancels are **O(n)** (a
+`find_on_market` scan); babo's are **O(1)** (a cache-aware "PIN" structure). On a
+cancel-heavy *static* book the gap widens sharply with depth — the O(n) vs O(1)
+difference made visible.
 
 ---
 
-## The two scripts automate the whole throughput pipeline
+## Quick start
 
-`scripts/regen_references` and `scripts/compare_engines` cover the entire
-**perf + correctness** flow: generate the workload, produce reference hashes,
-run every scenario, and emit ready-to-paste reports. Each ships in **two
-flavors** — `.ps1` (Windows PowerShell) and `.sh` (Linux / macOS / git-bash) —
-with identical behavior. The `.sh` versions auto-handle `harness` vs
-`harness.exe` and `.so` / `.dll` / `.dylib`.
+**Prereqs:** CMake ≥ 3.23, a C++20 compiler (MSVC 19.3+, clang 14+, or gcc 11+),
+and internet on the *first* configure (CMake fetches googletest, spdlog, and
+SPSCQueue).
 
-Both scripts take the **benchmark build dir** as an argument (or auto-detect the
-newest `cmake-build-*/benchmark` if omitted).
+```bash
+# 1. configure (Release is required for meaningful numbers)
+cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
+
+# 2. build everything (all engines, adapters, perf binaries, tests)
+cmake --build cmake-build-release -j
+```
+
+> **Windows + LLVM/clang:** add `-DCMAKE_RC_COMPILER="C:/Program Files/LLVM/bin/llvm-rc.exe"` to the configure step.
+
+That's it. The **easiest way to see it work** is the standalone perf binaries
+(next section) — no scripts, no setup, just run one.
+
+---
+
+## Try it: the perf binaries (easiest path)
+
+Four self-contained micro-benchmarks live in `<build>/perf/`. They link an engine
+**directly** (no plugin boundary), pin themselves to an isolated CPU core, replay
+a deterministic workload, and print a clean throughput report.
+
+| Binary | Engine | Aggregate depth |
+|---|---|---|
+| `babo_perf` | babo | **off** (lean) |
+| `babo_depth_perf` | babo | **on** |
+| `liqui_perf` | liquibook | **off** (lean) |
+| `liqui_depth_perf` | liquibook | **on** |
+
+```bash
+# run one scenario…
+./cmake-build-release/perf/babo_perf --scenario normal
+
+# …or every scenario, fewer reps for a quick pass
+./cmake-build-release/perf/liqui_perf --scenario all --reps 10
+```
+
+Options: `--scenario static|normal|swing25|flash_crash_40|flash_crash_60|all`
+(default `normal`), `--reps N` (default 100). You can also pass a pre-generated
+`workload.bin` as the first argument.
+
+Example output:
+
+```
+==============================================================
+  babobook   |   depth OFF
+  core 5   |   100 reps   |   1 warmup, then measured
+==============================================================
+  - pinned to core 5
+  - raised to real-time priority (isolating the core)
+
+  --- normal ------------------------------------
+      messages      1,996,097 x 100 reps = 199,609,700
+      wall time     17.5357 s
+      THROUGHPUT    11.38 M msgs/s
+      resting book  5,500  (sink)
+```
+
+> **Pinning:** the binaries pin to **core 5** and raise real-time priority. If you
+> see `could not raise priority`, run as admin/root for the cleanest numbers (it
+> still works without). To change the core, edit `kBenchCore` in the `perf/*.cpp`.
+
+### The depth comparison (a project highlight)
+
+Run all four and compare `babo_perf` vs `babo_depth_perf`, and `liqui_perf` vs
+`liqui_depth_perf`. You'll see maintaining an aggregate depth **barely dents
+liquibook but is nearly free on babo** — because babo doesn't maintain depth
+eagerly: it **derives** it on demand by walking the tree's top-N price levels
+(O(N) per query, nothing on the hot path), whereas liquibook's `std::multimap`
+book can't enumerate ordered levels cheaply and pays per-op. Depth is a
+compile-time toggle (`-DBABO_NO_DEPTH` / `-DLIQUI_NO_DEPTH`), so the two builds
+of each engine come from the exact same source.
+
+---
+
+## Full benchmark: throughput + correctness (the harness)
+
+The repeatable, apples-to-apples comparison runs through the **plugin harness**.
+Each engine is a shared library exporting the C functions in
+`benchmark/api/matching_engine_api.h`; the harness `dlopen`s it, replays a
+deterministic workload one message at a time, drains the engine's report stream
+over a lock-free transport on an adjacent core, hashes it (SHA-256), and compares
+to a **reference hash**.
+
+Two scripts automate the whole flow. Each ships as `.ps1` (Windows) **and** `.sh`
+(Linux/macOS/git-bash) with identical behavior, and takes the build's
+**benchmark dir** (`<build>/benchmark`) as an argument (auto-detected if omitted).
 
 ### 1. Generate correctness references
 
 References are **machine-specific** (the workload generator uses floating-point
-`exp`/`cos`/`log`/`pow`, which differ across CPU architectures and optimization
-levels), so you regenerate them on the machine + build you'll measure on. The
-script writes them from the trusted **liquibook** baseline, persists them into the
-source tree (so a rebuild's `POST_BUILD` copy doesn't revert them), and then
-verifies **babo** reproduces them byte-for-byte on all five scenarios.
+`exp`/`cos`/`log`/`pow`, which differ across CPUs), so regenerate them on the
+machine you measure on. The script writes them from the trusted **liquibook**
+baseline and verifies **babo** reproduces them byte-for-byte on all five scenarios.
 
 ```powershell
 # Windows
-powershell -ExecutionPolicy Bypass -File scripts\regen_references.ps1 -BenchDir cmake-build-release-system\benchmark
+powershell -ExecutionPolicy Bypass -File scripts\regen_references.ps1 -BenchDir cmake-build-release\benchmark
 ```
 ```bash
 # Linux / macOS / git-bash
 scripts/regen_references.sh --bench-dir cmake-build-release/benchmark
 ```
 
-Options: `-BenchDir`/`--bench-dir` (build's benchmark dir), `-Count`/`--count`
-(default **1,000,000** — the canonical size). A `PASS`/`VALID` on every scenario
-means babo is provably identical to the reference.
+A `PASS`/`VALID` on every scenario means babo is provably identical to the reference.
 
 ### 2. Compare engines (throughput)
 
-Runs all five scenarios for the engine under test **and** the liquibook baseline
-(best of N reps), then writes a console table plus a **CSV** and a paste-ready
-**Markdown** report under `<benchmark>/results/`.
+Runs all five scenarios for the engine under test vs the liquibook baseline (best
+of N reps), and writes a console table plus a **CSV** and paste-ready **Markdown**
+under `<benchmark>/results/`.
 
 ```powershell
 # Windows
-powershell -ExecutionPolicy Bypass -File scripts\compare_engines.ps1 -Engine adapters\babobook_adapter.dll -BenchDir cmake-build-release-system\benchmark
+powershell -ExecutionPolicy Bypass -File scripts\compare_engines.ps1 -Engine adapters\babobook_adapter.dll -BenchDir cmake-build-release\benchmark
 ```
 ```bash
 # Linux / macOS / git-bash
 scripts/compare_engines.sh --engine adapters/babobook_adapter.so --bench-dir cmake-build-release/benchmark
 ```
 
-Options: `-Engine`/`--engine` (adapter under test, relative to the benchmark
-dir), `-Baseline`/`--baseline` (defaults to the built liquibook),
-`-BenchDir`/`--bench-dir`, `-Count`/`--count` (default 1M), `-Reps`/`--reps`
-(default 3). Example output:
+Options: `--engine` (adapter under test, relative to the benchmark dir),
+`--baseline` (defaults to the built liquibook), `--bench-dir`, `--count` (default
+1,000,000), `--reps` (default 3).
 
-```
-Scenario     liquibook  babo   Speedup  Correctness
-static          1.91     6.09   3.19x    PASS
-normal          3.84     4.66   1.21x    PASS
-swing-25        2.45     4.87   1.99x    PASS
-swing-40        4.28     4.66   1.09x    PASS
-flash-crash     4.82     5.27   1.09x    PASS
-```
+> The adapters come in depth-off (`babobook_adapter`, `liquibook_adapter`) and
+> depth-on (`babobook_depth_adapter`, `liquibook_depth_adapter`) builds — point
+> `--engine` / `--baseline` at whichever pair you want to compare.
 
-> `static` is the headline: liquibook cancels are **O(n)** (a `find_on_market`
-> scan), babo's are **O(1)**. The gap widens with book depth, so it grows sharply
-> at the canonical 1M count.
-
-**Note:** `static` at 1M is slow for liquibook *by design* (that's the O(n)
-collapse). With `--reps 3` you pay that 3×; use `--reps 1` for a quick first pass.
+**Note:** `static` at 1M is slow for liquibook *by design* (the O(n) collapse).
+Use `--reps 1` for a quick first pass.
 
 ---
 
-## What the scripts do **not** run (and why)
+## Tests
 
-The compare script runs **`--mode perf` only** — throughput + correctness. It
-deliberately does **not** run audit or latency, because neither is a
-per-scenario throughput number you tabulate:
+Two GoogleTest binaries, registered with CTest:
 
-### Audit (anti-cheat)
+```bash
+ctest --test-dir cmake-build-release --output-on-failure
+# or run one binary directly:
+./cmake-build-release/test/babo_test/babo_unit
+```
 
-A separate **pass/fail certification**, run once per engine — not a speed metric.
-An engine could hardcode or replay the report stream to reproduce the published
-hash, but it can't answer *live* best-bid / best-ask / depth-at-price queries
-about a book it never actually maintained. So `--mode audit` replays the workload
-through a **trusted public baseline** and compares that baseline's query answers,
-at 64 **unpredictable** probe indices, to the answers the engine-under-test gave
-during its own run. Both modes probe `engine_query_*` at the same points, so an
-engine can't tell a measured run from an audited one.
+- `babo_unit` — babo engine tests (built with depth **on**, so it exercises the
+  full engine including the derived-depth walk).
+- `liqui_unit` — the upstream liquibook suite, treated as a frozen baseline.
 
-The baseline is auto-selected: **babo audits against liquibook**; liquibook would
-audit against **quantcup** (build it via `scripts/build_baselines.sh` — not built
-by default). Run it manually per engine:
+---
+
+## Anti-cheat audit (run once per engine)
+
+Not a speed metric — a **pass/fail honesty certification**. An engine could
+hardcode the report stream to reproduce the hash, but it can't answer *live*
+best-bid / best-ask / depth-at-price queries about a book it never maintained.
+`--mode audit` replays through a trusted baseline and compares that baseline's
+query answers, at 64 **unpredictable** probe indices, to the engine-under-test's.
 
 ```bash
 cd cmake-build-release/benchmark
 ./harness --engine ./babobook_adapter.so --scenario normal --mode audit
 ```
 
-A `perf` run is `VALID` on correctness alone; an `audit` run additionally
-requires the state audit to `PASS`. It's not scripted because you run it once to
-certify an engine is honest, not five times to fill a table.
+A `perf` run is `VALID` on correctness alone; an `audit` run additionally requires
+the state audit to `PASS`.
 
-### Latency
+---
 
-The harness has **no latency mode** — its speed metric is throughput, and for a
-single-threaded engine **median latency ≈ 1 / throughput** (e.g. 4.66 M msgs/s ⇒
-~215 ns/message). The report-stream transport also perturbs per-message timing,
-so a clean tail-latency histogram is measured **separately**, by the standalone,
-core-pinned micro-benchmarks in **`perf/`**:
+## Layout
 
-| Executable | Measures |
+| Path | What |
 |---|---|
-| `babo_latency` / `liqui_latency` | per-operation latency (ns), with percentiles |
-| `babo_perf` / `liqui_perf` | long deterministic replay suitable for hardware-counter profiling; also prints raw throughput |
+| `libs/babobook/` | the **babo** engine — `matching_book<SIZE, TRADE_CAP>`, header-only + one `.cpp` |
+| `libs/liquibook/` | the vendored reference engine (frozen) |
+| `benchmark/` | the plugin **harness** + the C-ABI contract (`api/matching_engine_api.h`) |
+| `benchmark/adapters/` | each engine wrapped behind the ABI as a shared lib (depth-on/off builds) |
+| `perf/` | the four standalone, core-pinned throughput binaries |
+| `scripts/` | `regen_references` + `compare_engines` (`.ps1` / `.sh`) |
+| `test/` | unit tests (`babo_unit`, `liqui_unit`) |
 
-These link the engine **directly** (no adapter / no shared-lib boundary) and pin
-to an isolated core, so the numbers are per-order latencies rather than harness
-throughput. Build and run them from the `perf/` targets:
+### How babo is fast
 
-```bash
-cmake --build cmake-build-release --target babo_latency liqui_latency
-./cmake-build-release/perf/babo_latency
-```
+- **`data_structures/pin_node.h`** — a Priority-Indicated Node: fixed-capacity
+  inline slots, intrusive links, **O(1) insert/erase** (slots never move). This is
+  the cache-aware structure behind O(1) cancel, vs liquibook's O(n)
+  `find_on_market` scan.
+- **`data_structures/narb_tree.h`** — per-side price-level tree with a threaded
+  best-first iterator; the source of truth for ordered price levels.
+- **`book/matching_book.h`** — the matching core. Depth is **derived** from the
+  tree on demand (see `depth()`), not maintained eagerly — so publishing depth
+  costs the hot path nothing.
 
 ---
 
 ## TL;DR
 
-1. **Build** Release (`harness generator liquibook_adapter babobook_adapter`).
-2. **`regen_references`** `--bench-dir <build>/benchmark` — references + babo verification.
-3. **`compare_engines`** `--engine adapters/babobook_adapter.<ext> --bench-dir <build>/benchmark` — throughput table + CSV + Markdown.
-4. **Audit** (manual, once per engine): `harness --engine ./babobook_adapter.<ext> --mode audit`.
-5. **Latency / hardware counters** (separate binaries): `perf/babo_latency`, `perf/babo_perf`, `perf/liqui_latency`, `perf/liqui_perf`.
-
-Steps 2–3 are fully automated by the two scripts; steps 4–5 are the intentionally
-separate certification and micro-latency passes.
+1. **Build:** `cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release && cmake --build cmake-build-release -j`
+2. **Try it:** `./cmake-build-release/perf/babo_perf --scenario all` (and the other three perf binaries).
+3. **Compare rigorously:** `regen_references` then `compare_engines` (`--bench-dir <build>/benchmark`).
+4. **Verify honesty (once):** `harness --engine ./babobook_adapter.<so|dll|dylib> --mode audit`.
+5. **Tests:** `ctest --test-dir cmake-build-release --output-on-failure`.

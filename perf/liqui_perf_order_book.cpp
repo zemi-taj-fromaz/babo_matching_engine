@@ -10,6 +10,7 @@
 //   liqui_perf [--scenario static|normal|swing25|flash_crash_40|flash_crash_60|all] [--reps N]
 //
 #include "bench_util.h"
+#include "bench_log.h"
 #include "workload.hpp"
 #include "workload_reader.h"
 
@@ -31,6 +32,15 @@ using clk  = std::chrono::steady_clock;
 
 static constexpr unsigned kBenchCore = 5;
 static constexpr int kMeasuredReps = 100;
+
+// Depth ON/OFF is a compile-time toggle (see perf/CMakeLists.txt): liqui_perf is
+// built with -DLIQUI_NO_DEPTH (lean), liqui_depth_perf without it (stock depth).
+static constexpr const char* kEngineName = "liquibook";
+#ifdef LIQUI_NO_DEPTH
+static constexpr bool kDepthOn = false;
+#else
+static constexpr bool kDepthOn = true;
+#endif
 
 namespace {
 
@@ -169,28 +179,26 @@ double replay_repeated(const std::vector<bench::WMsg>& w, std::size_t max_id, in
 }
 
 void run_workload(const char* label, const std::vector<bench::WMsg>& w, int reps) {
-    std::printf("liquibook perf: %s: %zu messages x %d reps\n", label, w.size(), reps);
-
     const std::size_t max_id = max_order_id(w);
     std::uint32_t sink = 0;
-
     replay_once(w, max_id, sink);                             // warmup
     const double sec = replay_repeated(w, max_id, reps, sink); // measured hot loop
-
-    bench::report_throughput(w.size() * static_cast<std::size_t>(reps), sec);
-    std::printf("  resting    : %u  (sink)\n", sink);
+    bench::log::result(label, w.size(), reps, sec, sink);
 }
 
 }  // namespace
 
 int main(int argc, char** argv) {
-    bench::pin_and_isolate(kBenchCore);
+    bench::log::init();
 
     Options options;
     if (!parse_options(argc, argv, options)) {
         print_usage(argv[0]);
         return 2;
     }
+
+    bench::log::banner(kEngineName, kDepthOn, kBenchCore, options.reps);
+    bench::log::pin_and_isolate(kBenchCore);
 
     if (options.workload_path) {
         const char* path = options.workload_path;
@@ -212,7 +220,7 @@ int main(int argc, char** argv) {
     } else if (const bench::Scenario* scenario = find_scenario(options.scenario)) {
         run_scenario(*scenario);
     } else {
-        std::fprintf(stderr, "unknown scenario: %s\n", options.scenario);
+        bench::log::error(std::string("unknown scenario: ") + options.scenario);
         print_usage(argv[0]);
         return 2;
     }
