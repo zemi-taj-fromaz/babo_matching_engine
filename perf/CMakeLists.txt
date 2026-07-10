@@ -3,11 +3,11 @@
 # Each target links only the engine it exercises. Console formatting is a
 # dependency-free header (perf/bench_log.h, ANSI colors).
 #
-# Depth ON vs OFF is a compile-time toggle, so each engine ships two binaries
-# from the SAME source:
-#   <engine>_perf        -> depth OFF  (lean; the fair head-to-head baseline)
-#   <engine>_depth_perf  -> depth ON   (stock behaviour: maintains aggregate depth)
-# babo toggles on BABO_NO_DEPTH; liquibook on LIQUI_NO_DEPTH (see
+# Depth is ON by default (babo derives it for ~free). The depth-OFF variants and
+# the pin_node capacity sweep are opt-in (keeps the default build lean):
+#   -DBABO_BUILD_NODEPTH=ON    -> babo_nodepth_perf, liqui_nodepth_perf
+#   -DBABO_BUILD_PIN_SWEEP=ON  -> babo_cap{16,32,64,128}_perf
+# babo toggles depth on BABO_NO_DEPTH; liquibook on LIQUI_NO_DEPTH (see
 # benchmark/adapters/liqui_book_type.h, which liqui_perf shares with the adapter).
 
 set(ADAPTERS_DIR ${CMAKE_SOURCE_DIR}/benchmark/adapters)   # for liqui_book_type.h
@@ -24,18 +24,21 @@ function(add_perf target source engine_lib)
     endif()
 endfunction()
 
-# --- liquibook --------------------------------------------------------------
-add_perf(liqui_perf       liqui_perf_order_book.cpp  liquibook_ref  LIQUI_NO_DEPTH)  # depth OFF
-add_perf(liqui_depth_perf liqui_perf_order_book.cpp  liquibook_ref)                  # depth ON
+# --- default: depth ON ------------------------------------------------------
+add_perf(liqui_perf  liqui_perf_order_book.cpp  liquibook_ref)   # depth ON
+add_perf(babo_perf   babo_perf_order_book.cpp   babobook)        # depth ON
 
-# --- babo -------------------------------------------------------------------
-add_perf(babo_perf        babo_perf_order_book.cpp   babobook  BABO_NO_DEPTH)        # depth OFF (pin=64)
-add_perf(babo_depth_perf  babo_perf_order_book.cpp   babobook)                       # depth ON
+# --- opt-in: pin_node capacity sweep (depth ON) -----------------------------
+# One babo_cap<N>_perf per capacity. Run them and compare THROUGHPUT to see how
+# orders-per-PIN-node affects cache behaviour. babo_cap64_perf == default babo_perf.
+if(BABO_BUILD_PIN_SWEEP)
+    foreach(CAP IN ITEMS 16 32 64 128)
+        add_perf(babo_cap${CAP}_perf babo_perf_order_book.cpp babobook BABO_PIN_CAPACITY=${CAP})
+    endforeach()
+endif()
 
-# pin_node capacity sweep (depth OFF, to isolate the core structure): builds one
-# babo_cap<N>_perf per capacity. Run them and compare THROUGHPUT to see how orders
-# per PIN node affects cache behaviour. NB: babo_cap64_perf == the default babo_perf.
-foreach(CAP IN ITEMS 16 32 64 128)
-    add_perf(babo_cap${CAP}_perf babo_perf_order_book.cpp babobook
-             BABO_NO_DEPTH BABO_PIN_CAPACITY=${CAP})
-endforeach()
+# --- opt-in: depth OFF (lean) -----------------------------------------------
+if(BABO_BUILD_NODEPTH)
+    add_perf(babo_nodepth_perf   babo_perf_order_book.cpp   babobook       BABO_NO_DEPTH)
+    add_perf(liqui_nodepth_perf  liqui_perf_order_book.cpp  liquibook_ref  LIQUI_NO_DEPTH)
+endif()

@@ -28,11 +28,14 @@ cmake --build cmake-build-release -j            # builds everything
 cmake --build cmake-build-release --target harness generator liquibook_adapter babobook_adapter
 ```
 
-Depth is a **compile-time toggle** (`BABO_NO_DEPTH` / `LIQUI_NO_DEPTH`), so each
-engine ships two adapters and two perf binaries from one source: `*_adapter` /
-`*_perf` are depth-OFF (lean, the fair head-to-head), `*_depth_adapter` /
-`*_depth_perf` are depth-ON. The perf binaries print via a dependency-free
-ANSI-color header (`perf/bench_log.h`) — no spdlog.
+Depth is a **compile-time toggle** (`BABO_NO_DEPTH` / `LIQUI_NO_DEPTH`), **ON by
+default** — babo derives depth from the tree for ~free, so depth-on is the
+canonical build. `babobook_adapter` / `liquibook_adapter` / `babo_perf` /
+`liqui_perf` are depth-on. Two options add opt-in experiment binaries (OFF by
+default): `-DBABO_BUILD_NODEPTH=ON` builds the lean `*_nodepth_*` variants;
+`-DBABO_BUILD_PIN_SWEEP=ON` builds `babo_cap{16,32,64,128}_perf` (the `pin_node`
+capacity sweep, `-DBABO_PIN_CAPACITY=N`). The perf binaries print via a
+dependency-free ANSI-color header (`perf/bench_log.h`) — no spdlog.
 
 - On Windows with the LLVM/clang toolchain, add
   `-DCMAKE_RC_COMPILER="C:/Program Files/LLVM/bin/llvm-rc.exe"`.
@@ -76,10 +79,11 @@ identical behavior; both take the build's **benchmark dir** as an argument.
 
 **Audit** (`--mode audit`) and the **perf/hardware-counter** micro-benchmarks are
 intentionally *not* scripted — see README. Audit is a once-per-engine pass/fail
-certification. The four standalone core-pinned `perf/` binaries (`babo_perf`,
-`babo_depth_perf`, `liqui_perf`, `liqui_depth_perf`) link the engine directly with
-no adapter/shared-lib boundary and print a colored throughput report; they are the
-depth-on/off comparison and the target for hardware-counter profiling.
+certification. The standalone core-pinned `perf/` binaries (`babo_perf`,
+`liqui_perf` by default, depth-on; `*_nodepth_perf` and `babo_cap*_perf` under the
+opt-in flags) link the engine directly with no adapter/shared-lib boundary and
+print a colored throughput report; they are the target for hardware-counter
+profiling and the depth / capacity experiments.
 
 ## Architecture
 
@@ -95,10 +99,10 @@ Three layers, decoupled by the C ABI:
   `engine_query_*`). Optional exports: `engine_get_transport`, `engine_prebuild`,
   `engine_on_batch` — read the header comments before implementing these, they carry
   strict anti-cheat contracts. `template_adapter.h.cpp` is the starting skeleton.
-  Built twice each (depth on/off): `{babobook,liquibook}_adapter` are depth-off,
-  `{babobook,liquibook}_depth_adapter` depth-on. `liqui_book_type.h` selects the
-  liquibook book type (`SimpleOrderBook` vs a depth-free `NoDepthBook`) and is
-  shared with `liqui_perf`.
+  `{babobook,liquibook}_adapter` are the depth-on default; the depth-off
+  `{babobook,liquibook}_nodepth_adapter` build only under `-DBABO_BUILD_NODEPTH=ON`.
+  `liqui_book_type.h` selects the liquibook book type (`SimpleOrderBook` vs a
+  depth-free `NoDepthBook`) and is shared with `liqui_perf`.
 - **Harness** (`benchmark/src/`): `dlopen`s an adapter, replays a deterministic
   workload, drains the engine's report stream over an SPSC transport on an adjacent
   core, hashes it (`third_party/sha256.c`), and compares to the reference. Reports

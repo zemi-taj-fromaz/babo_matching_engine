@@ -35,11 +35,16 @@ header.
 # 1. configure (Release is required for meaningful numbers)
 cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
 
-# 2. build everything (all engines, adapters, perf binaries, tests)
+# 2. build everything (both engines, adapters, perf binaries, tests)
 cmake --build cmake-build-release -j
 ```
 
 > **Windows + LLVM/clang:** add `-DCMAKE_RC_COMPILER="C:/Program Files/LLVM/bin/llvm-rc.exe"` to the configure step.
+
+The default build is depth-on and lean. Two optional flags add experiment binaries
+(see [below](#optional-builds-the-depth-comparison--the-pin-sweep)):
+`-DBABO_BUILD_NODEPTH=ON` (depth-off variants) and `-DBABO_BUILD_PIN_SWEEP=ON`
+(the `pin_node` capacity sweep).
 
 That's it. The **easiest way to see it work** is the standalone perf binaries
 (next section) — no scripts, no setup, just run one.
@@ -48,16 +53,14 @@ That's it. The **easiest way to see it work** is the standalone perf binaries
 
 ## Try it: the perf binaries (easiest path)
 
-Four self-contained micro-benchmarks live in `<build>/perf/`. They link an engine
+Two self-contained micro-benchmarks live in `<build>/perf/`. They link an engine
 **directly** (no plugin boundary), pin themselves to an isolated CPU core, replay
 a deterministic workload, and print a clean throughput report.
 
 | Binary | Engine | Aggregate depth |
 |---|---|---|
-| `babo_perf` | babo | **off** (lean) |
-| `babo_depth_perf` | babo | **on** |
-| `liqui_perf` | liquibook | **off** (lean) |
-| `liqui_depth_perf` | liquibook | **on** |
+| `babo_perf` | babo | **on** (default) |
+| `liqui_perf` | liquibook | **on** (default) |
 
 ```bash
 # run one scenario…
@@ -92,16 +95,31 @@ Example output:
 > see `could not raise priority`, run as admin/root for the cleanest numbers (it
 > still works without). To change the core, edit `kBenchCore` in the `perf/*.cpp`.
 
-### The depth comparison (a project highlight)
+### Optional builds: the depth comparison & the pin sweep
 
-Run all four and compare `babo_perf` vs `babo_depth_perf`, and `liqui_perf` vs
-`liqui_depth_perf`. You'll see maintaining an aggregate depth **barely dents
-liquibook but is nearly free on babo** — because babo doesn't maintain depth
-eagerly: it **derives** it on demand by walking the tree's top-N price levels
-(O(N) per query, nothing on the hot path), whereas liquibook's `std::multimap`
-book can't enumerate ordered levels cheaply and pays per-op. Depth is a
-compile-time toggle (`-DBABO_NO_DEPTH` / `-DLIQUI_NO_DEPTH`), so the two builds
+Depth is **on by default** — because babo doesn't maintain it eagerly, it
+**derives** it on demand by walking the tree's top-N price levels (O(N) per query,
+nothing on the hot path), so publishing depth is nearly free. liquibook's
+`std::multimap` book can't enumerate ordered levels cheaply and pays per-op. To
+see that gap yourself, configure with the depth-OFF variants and compare:
+
+```bash
+cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release -DBABO_BUILD_NODEPTH=ON
+cmake --build cmake-build-release -j
+# then compare, e.g.:  babo_perf (depth) vs babo_nodepth_perf,  liqui_perf vs liqui_nodepth_perf
+```
+
+Depth is a compile-time toggle (`BABO_NO_DEPTH` / `LIQUI_NO_DEPTH`), so both builds
 of each engine come from the exact same source.
+
+A second flag builds a **`pin_node` capacity sweep** — `babo_cap{16,32,64,128}_perf`
+— to compare how orders-per-node affects cache behaviour:
+
+```bash
+cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release -DBABO_BUILD_PIN_SWEEP=ON
+cmake --build cmake-build-release -j
+for c in 16 32 64 128; do ./cmake-build-release/perf/babo_cap${c}_perf --scenario normal --reps 20; done
+```
 
 ---
 
@@ -155,9 +173,10 @@ Options: `--engine` (adapter under test, relative to the benchmark dir),
 `--baseline` (defaults to the built liquibook), `--bench-dir`, `--count` (default
 1,000,000), `--reps` (default 3).
 
-> The adapters come in depth-off (`babobook_adapter`, `liquibook_adapter`) and
-> depth-on (`babobook_depth_adapter`, `liquibook_depth_adapter`) builds — point
-> `--engine` / `--baseline` at whichever pair you want to compare.
+> `babobook_adapter` and `liquibook_adapter` are the depth-on (default) builds. If
+> you configured with `-DBABO_BUILD_NODEPTH=ON`, the lean `babobook_nodepth_adapter`
+> / `liquibook_nodepth_adapter` are also available — point `--engine` / `--baseline`
+> at whichever pair you want to compare.
 
 **Note:** `static` at 1M is slow for liquibook *by design* (the O(n) collapse).
 Use `--reps 1` for a quick first pass.

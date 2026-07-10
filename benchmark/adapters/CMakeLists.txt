@@ -1,10 +1,8 @@
-# matching_engine_api.h adapters. Depth ON vs OFF is a compile-time toggle, so
-# each engine ships two adapters from the SAME source:
-#   <engine>_adapter        -> depth OFF  (lean; the fair head-to-head baseline)
-#   <engine>_depth_adapter  -> depth ON   (stock: maintains an aggregate depth)
-# babo toggles on BABO_NO_DEPTH; liquibook on LIQUI_NO_DEPTH (liqui_book_type.h).
-# All export the C ABI via WINDOWS_EXPORT_ALL_SYMBOLS and drop the "lib" prefix so
-# the harness's --baseline / engine-under-test flags find <name>.{dll,so}.
+# matching_engine_api.h adapters. Depth is ON by default (babo derives it for
+# ~free); the depth-OFF variants are opt-in via -DBABO_BUILD_NODEPTH=ON. babo
+# toggles on BABO_NO_DEPTH; liquibook on LIQUI_NO_DEPTH (liqui_book_type.h). All
+# export the C ABI via WINDOWS_EXPORT_ALL_SYMBOLS and drop the "lib" prefix so the
+# harness's --baseline / engine-under-test flags find <name>.{dll,so}.
 
 # helper: one SHARED adapter target with the shared property set + an optional
 # depth macro.
@@ -19,10 +17,12 @@ function(add_adapter target source engine_lib)
     endif()
 endfunction()
 
-# --- babo -------------------------------------------------------------------
-add_adapter(babobook_adapter       babobook_adapter.cpp  babobook  BABO_NO_DEPTH)  # depth OFF
-add_adapter(babobook_depth_adapter babobook_adapter.cpp  babobook)                 # depth ON
+# --- default: depth ON ------------------------------------------------------
+add_adapter(babobook_adapter   babobook_adapter.cpp   babobook)          # depth ON
+add_adapter(liquibook_adapter  liquibook_adapter.cpp  liquibook_ref)     # depth ON
 
-# --- liquibook --------------------------------------------------------------
-add_adapter(liquibook_adapter       liquibook_adapter.cpp  liquibook_ref  LIQUI_NO_DEPTH)  # depth OFF
-add_adapter(liquibook_depth_adapter liquibook_adapter.cpp  liquibook_ref)                  # depth ON
+# --- opt-in: depth OFF (lean) -----------------------------------------------
+if(BABO_BUILD_NODEPTH)
+    add_adapter(babobook_nodepth_adapter   babobook_adapter.cpp   babobook       BABO_NO_DEPTH)
+    add_adapter(liquibook_nodepth_adapter  liquibook_adapter.cpp  liquibook_ref  LIQUI_NO_DEPTH)
+endif()
