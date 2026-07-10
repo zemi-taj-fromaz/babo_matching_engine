@@ -1,10 +1,10 @@
-// Aggregate depth structure + change-stamp publication.
+// Aggregate depth, DERIVED from the tree on demand (matching_book::depth()).
 //
-// Exercises price ordering, per-level aggregation, the excess-level spill/restore
-// path (more distinct prices than SIZE), and the ChangedChecker stamp helper that
-// backs depth/bbo notification.
+// Exercises price ordering, per-level aggregation, and the "spill/restore" behaviour
+// with more distinct prices than SIZE -- which now falls out for free from walking the
+// tree's top-SIZE levels (drop the best, the next level is simply the next node in the
+// walk; no excess map to restore from).
 #include "unit/babo_test_utils.h"
-#include "unit/changed_checker.h"
 
 #include <gtest/gtest.h>
 
@@ -70,19 +70,6 @@ TEST_F(SmallBook, ExcessLevelsSpillAndRestore)
   EXPECT_EQ(b[0].price(), 13u);
   EXPECT_EQ(b[1].price(), 12u);
   EXPECT_EQ(b[2].price(), 11u);
-}
-
-// The best bid's change stamp advances when a new, better bid arrives.
-TEST_F(Fixture, BboStampChangesOnNewBest)
-{
-  SimpleOrder first(BUY, 10, 100);
-  book.add(first);
-
-  ChangedChecker<5> cc(book.depth());   // snapshot current change id
-  SimpleOrder better(BUY, 11, 100);
-  book.add(better);
-
-  EXPECT_TRUE(cc.verify_bbo_changed(/*bid*/true, /*ask*/false));
 }
 
 } // namespace babo::test

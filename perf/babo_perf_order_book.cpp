@@ -26,8 +26,8 @@ using Order  = babo::simple::SimpleOrder;
 using Book   = bk::matching_book<5>;           // canonical depth (matches the adapter)
 using clk    = std::chrono::steady_clock;
 
-static constexpr unsigned kBenchCore = 2;      // change to a free physical core
-static constexpr int kMeasuredReps = 10;       // dilutes startup/load/print noise in perf stat
+static constexpr unsigned kBenchCore = 5;      // change to a free physical core
+static constexpr int kMeasuredReps = 100;       // dilutes startup/load/print noise in perf stat
 
 namespace {
 

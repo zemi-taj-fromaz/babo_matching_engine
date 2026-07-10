@@ -3,6 +3,7 @@
 //
 
 #include "../api/matching_engine_api.h"
+#include "liqui_book_type.h"       // babo_bench::LiquiBook (depth ON/OFF via -DLIQUI_NO_DEPTH)
 #include <simple/simple_order.h>
 #include <simple/simple_order_book.h>
 
@@ -22,9 +23,11 @@ static inline void cpu_pause() {}
 
 namespace {
 
+// Book type: SimpleOrderBook<5> (depth ON) by default, NoDepthBook under
+// -DLIQUI_NO_DEPTH. Shared with liqui_perf so both build depth-on/off variants.
 using LO    = liquibook::simple::SimpleOrder;
-using LBook = liquibook::simple::SimpleOrderBook<5>;
 namespace lb = liquibook::book;
+using LBook = babo_bench::LiquiBook;
 
 LBook* g_book = nullptr;
 /* Harness order ids are dense and 1-based (a permutation of 1..N_new), so a

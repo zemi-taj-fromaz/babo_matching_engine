@@ -52,21 +52,22 @@ public:
     void set_order_listener(OrderEventListener* l)                 noexcept { order_listener_ = l; }
     void set_trade_listener(book::TradeListener<matching_book>* l) noexcept { trade_listener_ = l; }
     void set_order_book_listener(book::OrderBookListener<matching_book>* l) noexcept { book_listener_ = l; }
-    void set_depth_listener(book::DepthListener<matching_book>* l) noexcept { depth_listener_ = l; }
-    void set_bbo_listener(book::BboListener<matching_book>* l)     noexcept { bbo_listener_ = l; }
+    // NOTE: depth is now PULL-based -- query depth() when you want a snapshot. There is
+    // no per-op depth/bbo push listener; a market-data publisher derives depth off the
+    // hot path from the order-event stream (or by calling depth()), mirroring how real
+    // exchanges separate matching from market-data dissemination.
 
     // Submit an order. Rejected if size is zero; stop orders whose trigger hasn't been reached
     // are parked; otherwise it matches the opposite side (market crosses everything) and any
     // remainder rests.
     void add(simple::SimpleOrder order)
     {
-        const std::uint32_t id = order.order_id_;
         if (order.order_qty() == 0)
         {
-            if (order_listener_) order_listener_->on_reject(id, "size must be positive");
+            if (order_listener_) order_listener_->on_reject(order.order_id_, "size must be positive");
             return;
         }
-        if (order_listener_) order_listener_->on_accept(id);   // accepted into the book
+        if (order_listener_) order_listener_->on_accept(order.order_id_);   // accepted into the book
 
         if (order.stop_price() != 0 && is_stopped(order))
             park_stop(order);                                  // held until the market reaches it
@@ -128,7 +129,6 @@ public:
             // A reduction that meets/exceeds the open qty collapses the order -> cancel it.
             if (size_delta < 0 && static_cast<std::uint32_t>(-size_delta) >= open)
             {
-                depth_.close_order(static_cast<std::uint32_t>(cur_price), open, is_buy);
                 if (is_buy) bids_.erase(order_id); else asks_.erase(order_id);
             }
             else
@@ -136,7 +136,6 @@ public:
                 o->modify(size_delta, book::PRICE_UNCHANGED);   // order_qty_ += size_delta
                 o->_level->_quantity = static_cast<std::uint32_t>(
                     static_cast<std::int64_t>(o->_level->_quantity) + size_delta);
-                depth_.change_qty_order(static_cast<std::uint32_t>(cur_price), size_delta, is_buy);
             }
             if (order_listener_)
                 order_listener_->on_replace(order_id, size_delta, static_cast<std::uint32_t>(cur_price));
@@ -146,7 +145,6 @@ public:
 
         // --- slow path: price changed, so cancel + re-submit ---
         simple::SimpleOrder copy = *o;
-        depth_.close_order(static_cast<std::uint32_t>(cur_price), o->open_qty(), is_buy);
         if (is_buy) bids_.erase(order_id); else asks_.erase(order_id);
 
         copy.modify(size_delta, new_price);
@@ -180,8 +178,19 @@ public:
     [[nodiscard]] const trade& read_trade() noexcept { return trade_ring_[trade_r_++ & (TRADE_CAP - 1)]; }
     [[nodiscard]] narb_tree<order_type::BID>& bids() noexcept { return bids_; }
     [[nodiscard]] narb_tree<order_type::ASK>& asks() noexcept { return asks_; }
-    [[nodiscard]] book::Depth<SIZE>&       depth()       noexcept { return depth_; }
-    [[nodiscard]] const book::Depth<SIZE>& depth() const noexcept { return depth_; }
+    // Aggregate top-of-book depth, DERIVED on demand: walk each side's top-SIZE price
+    // levels best-first and read the qty/count that every price_level_descriptor already
+    // carries. O(SIZE) per call, and the matching hot path pays nothing. Compiled out
+    // under BABO_NO_DEPTH. Non-const: it repopulates the snapshot buffer in place.
+#ifndef BABO_NO_DEPTH
+    [[nodiscard]] DepthTracker& depth() noexcept
+    {
+        depth_.clear();
+        fill_depth_side(bids_, depth_.bids());
+        fill_depth_side(asks_, depth_.asks());
+        return depth_;
+    }
+#endif
 
 private:
     // Match against the opposite side, then rest the remainder (unless market/IOC).
@@ -193,31 +202,31 @@ private:
 
         if (!is_market && !order.immediate_or_cancel() && order.open_qty() > 0)
         {
-            const std::uint32_t rest_qty = order.open_qty();
-            const std::uint64_t px       = order.price();
-            const bool          is_buy   = order.is_buy();
-            if (is_buy) bids_.insert(order);
-            else        asks_.insert(order);
-            depth_.add_order(static_cast<std::uint32_t>(px), rest_qty, is_buy);
+            if (order.is_buy()) bids_.insert(order);
+            else                asks_.insert(order);
         }
         // Publishing happens once per public op in notify().
     }
 
-    // Fire the per-operation listeners: book change (always), then depth/bbo if the aggregate
-    // depth changed since the last publish.
+    // Fire the per-operation book-change listener. Depth is pull-based (see depth());
+    // nothing is pushed per op -- a market-data layer derives depth off the hot path.
     void notify()
     {
         if (book_listener_) book_listener_->on_order_book_change(this);
-        if (depth_.changed())
-        {
-            const std::uint32_t last = depth_.last_published_change();
-            if (depth_listener_) depth_listener_->on_depth_change(this, &depth_);
-            if (bbo_listener_ &&
-                (depth_.bids()->changed_since(last) || depth_.asks()->changed_since(last)))
-                bbo_listener_->on_bbo_change(this, &depth_);
-        }
-        depth_.published();
     }
+
+#ifndef BABO_NO_DEPTH
+    // Fill `out[0..SIZE)` from a side's top-SIZE price levels, best-first. Each level's
+    // qty/count are read straight off the price_level_descriptor. Unfilled slots stay
+    // empty (cleared by depth()). O(SIZE); the walked levels are the hottest in the tree.
+    template <class SideTree>
+    static void fill_depth_side(SideTree& tree, book::DepthLevel* out) noexcept
+    {
+        int i = 0;
+        for (auto it = tree.begin(); it != tree.end() && i < SIZE; ++it, ++i)
+            out[i].set(static_cast<std::uint32_t>(it->_price), it->_quantity, it->_count);
+    }
+#endif
 
     // A resting maker at its price crosses the incoming (a market incoming crosses everything).
     static bool crosses(const simple::SimpleOrder& maker, const simple::SimpleOrder& in) noexcept
@@ -237,7 +246,6 @@ private:
         maker.fill(qty, cost, 0);
         maker._level->_quantity -= qty;
         const bool maker_filled = (maker.open_qty() == 0);
-        depth_.fill_order(static_cast<std::uint32_t>(px), qty, maker_filled, maker.is_buy());
         trade_ring_[trade_w_ & (TRADE_CAP - 1)] = {maker.order_id_, in.order_id_, qty, px};
         ++trade_w_;
         if (trade_w_ - trade_r_ > TRADE_CAP) ++trade_r_;   // consumer fell behind: drop the oldest unread
@@ -310,11 +318,10 @@ private:
     }
 
     template <class SideTree>
-    bool cancel_side(std::uint32_t order_id, SideTree& side, bool is_buy)
+    bool cancel_side(std::uint32_t order_id, SideTree& side, [[maybe_unused]] bool is_buy)
     {
         simple::SimpleOrder* o = side.find_order(order_id);
         if (!o) return false;
-        depth_.close_order(static_cast<std::uint32_t>(o->price()), o->open_qty(), is_buy);
         side.erase(order_id);
         return true;
     }
@@ -364,13 +371,13 @@ private:
     narb_tree<order_type::ASK> asks_;      // resting sell orders
     narb_tree<order_type::ASK> stopBids_;  // parked BUY stops, keyed by stop price (lowest first)
     narb_tree<order_type::BID> stopAsks_;  // parked SELL stops, keyed by stop price (highest first)
-    book::Depth<SIZE> depth_;              // aggregate top-of-book view
+#ifndef BABO_NO_DEPTH
+    book::Depth<SIZE> depth_;              // top-of-book snapshot, rebuilt on depth() (pull-based)
+#endif
 
     OrderEventListener*                    order_listener_ = nullptr;
     book::TradeListener<matching_book>*    trade_listener_ = nullptr;
     book::OrderBookListener<matching_book>* book_listener_ = nullptr;
-    book::DepthListener<matching_book>*    depth_listener_ = nullptr;
-    book::BboListener<matching_book>*      bbo_listener_   = nullptr;
 
     std::array<trade, TRADE_CAP> trade_ring_;  // inline; no heap
     std::uint64_t trade_w_ = 0;            // monotonic write cursor (total trades ever executed)

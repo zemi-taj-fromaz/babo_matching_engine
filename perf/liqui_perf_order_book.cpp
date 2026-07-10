@@ -14,6 +14,7 @@
 #include "workload_reader.h"
 
 #include <cstdlib>
+#include "liqui_book_type.h"       // babo_bench::LiquiBook (depth ON/OFF via -DLIQUI_NO_DEPTH)
 #include <simple/simple_order.h>
 #include <simple/simple_order_book.h>
 
@@ -24,12 +25,12 @@
 
 namespace lb = liquibook::book;
 using LO   = liquibook::simple::SimpleOrder;
-using Book = liquibook::simple::SimpleOrderBook<5>;
+using Book = babo_bench::LiquiBook;   // SimpleOrderBook<5> (depth ON) or NoDepthBook (-DLIQUI_NO_DEPTH)
 using liquibook::simple::os_accepted;
 using clk  = std::chrono::steady_clock;
 
-static constexpr unsigned kBenchCore = 2;
-static constexpr int kMeasuredReps = 10;
+static constexpr unsigned kBenchCore = 5;
+static constexpr int kMeasuredReps = 100;
 
 namespace {
 

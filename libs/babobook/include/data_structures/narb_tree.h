@@ -495,7 +495,7 @@ price_level_descriptor* narb_tree<type>::make_level(std::uint64_t price)
     level->_color = color::RED;   // neighbor_aware_insert -> insert_rebalance fixes colours
     level->_price = price;
     level->_quantity = 0;
-    level->_depth = 0;
+    level->_count = 0;
     level->_head = {nullptr, 0};  // empty PIN chain; first insert allocates the node
     level->_tail = {nullptr, 0};
     return level;
@@ -533,6 +533,7 @@ void narb_tree<type>::place_order(price_level_descriptor* level, simple::SimpleO
     level->_tail = loc;
     _order_index[id] = loc;
     level->_quantity += qty;
+    ++level->_count;                 // one more resting order at this level (depth walk)
 }
 
 template <order_type type>
@@ -689,6 +690,7 @@ void narb_tree<type>::erase(std::uint32_t order_id)
     _order_index.erase(it);
 
     level->_quantity -= node->at(loc.index).open_qty();
+    --level->_count;                 // one fewer resting order at this level (depth walk)
 
     const bool was_head = (level->_head.pin_loc == node && level->_head.index == loc.index);
     const bool was_tail = (level->_tail.pin_loc == node && level->_tail.index == loc.index);

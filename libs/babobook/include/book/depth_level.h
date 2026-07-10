@@ -81,7 +81,8 @@ DepthLevel::changed_since(uint32_t last_published_change) const
 inline DepthLevel::DepthLevel()
   : price_(INVALID_LEVEL_PRICE),
   order_count_(0),
-  aggregate_qty_(0)
+  aggregate_qty_(0),
+  is_excess_(false)
 {
 }
 
@@ -177,6 +178,7 @@ DepthLevel::set(uint32_t price,
   aggregate_qty_ = qty;
   order_count_ = order_count;
   last_change_ = last_change;
+  is_excess_ = false;   // snapshot levels come straight from the tree, never "excess"
 }
 
 inline
