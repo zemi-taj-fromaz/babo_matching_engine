@@ -1,0 +1,79 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='900' height='520' viewBox='0 0 900 520'>
+<rect width='100%' height='100%' fill='white'/>
+<style>text{font-family:Arial,sans-serif;fill:#222}.grid{stroke:#e8e8e8}.axis{stroke:#333}</style>
+<text x='450' y='28' text-anchor='middle' font-size='17' font-weight='bold'>babo cancel/throughput speedup vs liquibook</text>
+<line class='grid' x1='85' y1='446.0' x2='725' y2='446.0'/>
+<text x='77' y='450.0' text-anchor='end' font-size='11'>0.0</text>
+<line class='grid' x1='85' y1='367.2' x2='725' y2='367.2'/>
+<text x='77' y='371.2' text-anchor='end' font-size='11'>0.7</text>
+<line class='grid' x1='85' y1='288.4' x2='725' y2='288.4'/>
+<text x='77' y='292.4' text-anchor='end' font-size='11'>1.4</text>
+<line class='grid' x1='85' y1='209.6' x2='725' y2='209.6'/>
+<text x='77' y='213.6' text-anchor='end' font-size='11'>2.1</text>
+<line class='grid' x1='85' y1='130.8' x2='725' y2='130.8'/>
+<text x='77' y='134.8' text-anchor='end' font-size='11'>2.8</text>
+<line class='grid' x1='85' y1='52.0' x2='725' y2='52.0'/>
+<text x='77' y='56.0' text-anchor='end' font-size='11'>3.5</text>
+<line class='axis' x1='85' y1='52' x2='85' y2='446'/>
+<line class='axis' x1='85' y1='446' x2='725' y2='446'/>
+<text x='85.0' y='466' text-anchor='middle' font-size='10'>1K</text>
+<text x='220.6' y='466' text-anchor='middle' font-size='10'>9K</text>
+<text x='278.9' y='466' text-anchor='middle' font-size='10'>19K</text>
+<text x='337.2' y='466' text-anchor='middle' font-size='10'>39K</text>
+<text x='414.6' y='466' text-anchor='middle' font-size='10'>99K</text>
+<text x='472.9' y='466' text-anchor='middle' font-size='10'>199K</text>
+<text x='531.1' y='466' text-anchor='middle' font-size='10'>399K</text>
+<text x='608.3' y='466' text-anchor='middle' font-size='10'>998K</text>
+<text x='666.6' y='466' text-anchor='middle' font-size='10'>1M</text>
+<text x='725.0' y='466' text-anchor='middle' font-size='10'>3M</text>
+<polyline fill='none' stroke='#1769aa' stroke-width='3' points='85.0,313.4 220.6,162.8 278.9,159.2 337.2,143.6 414.6,255.9 472.9,245.1 531.1,179.3 608.3,172.7 666.6,177.5 725.0,87.8'/>
+<circle cx='85.0' cy='313.4' r='4' fill='#1769aa'/>
+<circle cx='220.6' cy='162.8' r='4' fill='#1769aa'/>
+<circle cx='278.9' cy='159.2' r='4' fill='#1769aa'/>
+<circle cx='337.2' cy='143.6' r='4' fill='#1769aa'/>
+<circle cx='414.6' cy='255.9' r='4' fill='#1769aa'/>
+<circle cx='472.9' cy='245.1' r='4' fill='#1769aa'/>
+<circle cx='531.1' cy='179.3' r='4' fill='#1769aa'/>
+<circle cx='608.3' cy='172.7' r='4' fill='#1769aa'/>
+<circle cx='666.6' cy='177.5' r='4' fill='#1769aa'/>
+<circle cx='725.0' cy='87.8' r='4' fill='#1769aa'/>
+<line x1='739' y1='60' x2='765' y2='60' stroke='#1769aa' stroke-width='3'/><text x='771' y='64' font-size='12'>Normal</text>
+<polyline fill='none' stroke='#d95f02' stroke-width='3' points='85.0,303.2 220.6,150.4 278.9,193.1 337.2,135.2 414.6,255.9 472.9,255.2 531.1,243.0 608.3,189.9 666.6,168.9 725.0,191.3'/>
+<circle cx='85.0' cy='303.2' r='4' fill='#d95f02'/>
+<circle cx='220.6' cy='150.4' r='4' fill='#d95f02'/>
+<circle cx='278.9' cy='193.1' r='4' fill='#d95f02'/>
+<circle cx='337.2' cy='135.2' r='4' fill='#d95f02'/>
+<circle cx='414.6' cy='255.9' r='4' fill='#d95f02'/>
+<circle cx='472.9' cy='255.2' r='4' fill='#d95f02'/>
+<circle cx='531.1' cy='243.0' r='4' fill='#d95f02'/>
+<circle cx='608.3' cy='189.9' r='4' fill='#d95f02'/>
+<circle cx='666.6' cy='168.9' r='4' fill='#d95f02'/>
+<circle cx='725.0' cy='191.3' r='4' fill='#d95f02'/>
+<line x1='739' y1='80' x2='765' y2='80' stroke='#d95f02' stroke-width='3'/><text x='771' y='84' font-size='12'>Swing-25</text>
+<polyline fill='none' stroke='#1b9e77' stroke-width='3' points='85.0,298.5 220.6,180.6 278.9,156.8 337.2,153.1 414.6,267.6 472.9,248.1 531.1,239.3 608.3,188.7 666.6,164.1 725.0,186.2'/>
+<circle cx='85.0' cy='298.5' r='4' fill='#1b9e77'/>
+<circle cx='220.6' cy='180.6' r='4' fill='#1b9e77'/>
+<circle cx='278.9' cy='156.8' r='4' fill='#1b9e77'/>
+<circle cx='337.2' cy='153.1' r='4' fill='#1b9e77'/>
+<circle cx='414.6' cy='267.6' r='4' fill='#1b9e77'/>
+<circle cx='472.9' cy='248.1' r='4' fill='#1b9e77'/>
+<circle cx='531.1' cy='239.3' r='4' fill='#1b9e77'/>
+<circle cx='608.3' cy='188.7' r='4' fill='#1b9e77'/>
+<circle cx='666.6' cy='164.1' r='4' fill='#1b9e77'/>
+<circle cx='725.0' cy='186.2' r='4' fill='#1b9e77'/>
+<line x1='739' y1='100' x2='765' y2='100' stroke='#1b9e77' stroke-width='3'/><text x='771' y='104' font-size='12'>Swing-40</text>
+<polyline fill='none' stroke='#7570b3' stroke-width='3' points='85.0,314.5 220.6,120.0 278.9,173.3 337.2,143.3 414.6,301.0 472.9,249.1 531.1,244.8 608.3,182.3 666.6,168.1 725.0,186.3'/>
+<circle cx='85.0' cy='314.5' r='4' fill='#7570b3'/>
+<circle cx='220.6' cy='120.0' r='4' fill='#7570b3'/>
+<circle cx='278.9' cy='173.3' r='4' fill='#7570b3'/>
+<circle cx='337.2' cy='143.3' r='4' fill='#7570b3'/>
+<circle cx='414.6' cy='301.0' r='4' fill='#7570b3'/>
+<circle cx='472.9' cy='249.1' r='4' fill='#7570b3'/>
+<circle cx='531.1' cy='244.8' r='4' fill='#7570b3'/>
+<circle cx='608.3' cy='182.3' r='4' fill='#7570b3'/>
+<circle cx='666.6' cy='168.1' r='4' fill='#7570b3'/>
+<circle cx='725.0' cy='186.3' r='4' fill='#7570b3'/>
+<line x1='739' y1='120' x2='765' y2='120' stroke='#7570b3' stroke-width='3'/><text x='771' y='124' font-size='12'>Flash-crash-60</text>
+<text transform='translate(20 249) rotate(-90)' text-anchor='middle' font-size='13'>Speedup (x)</text>
+<text x='405' y='508' text-anchor='middle' font-size='13'>Messages replayed (log)</text>
+</svg>

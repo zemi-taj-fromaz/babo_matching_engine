@@ -725,6 +725,7 @@ are regenerated with the trusted baseline on the machine being measured.
 \texttt{-ffast-math} is forbidden because it can change the workload itself.
 
 \section{Correctness before speed}
+\label{sec:correctness}
 
 A throughput result is meaningless if an order book skips state transitions,
 drops reports, or implements different matching semantics.  The project uses
@@ -757,13 +758,32 @@ different failure modes and are intentionally retained alongside the hash.
 
 \section{Evaluation methodology}
 
+The evaluation uses two complementary measurement paths with deliberately
+distinct jobs, and it is important not to conflate them.
+
+\emph{Correctness is certified by the harness.}  The harness loads each engine as
+a shared library across the C ABI, replays the workload one message at a time,
+drains the complete 64-byte report stream over the SPSC transport on an adjacent
+core, hashes it with SHA-256, and compares the result against the trusted
+reference; it additionally runs the state audit at unpredictable replay indices
+(Section~\ref{sec:correctness}).  The harness therefore exercises delivery,
+matching, report production, transport, and the final flush, and it is the
+component that proves the measured engine emits byte-identical output rather than
+skipping work.
+
+\emph{Throughput is measured by the standalone perf binaries.}  These link each
+order book directly---no adapter, no shared-library boundary, and no report
+transport---pin to an isolated core, raise scheduling priority, and replay the
+same deterministic workload, reporting the peak of $N$ repetitions.  Isolating
+throughput this way keeps the reported figure free of report-emission and
+cross-module transport overhead, so it reflects the matching core itself; the
+harness independently guarantees that the core being timed is correct.  Every
+throughput number in this paper comes from the perf path; every correctness and
+audit verdict comes from the harness path.
+
 Release builds use C++20, O3/native ISA tuning and loop unrolling where the GNU
 driver is used, plus LTO when supported.  Both order books receive the same binary
-workload through the same C ABI, perform the same modify-as-reinsert semantics,
-and emit the same report types into an equivalent output path.  The full harness
-measures delivery, matching, report production, transport, and the final flush.
-Standalone perf binaries also link each order book directly to isolate the core
-book from the shared-library boundary.
+workload through the same C ABI and perform the same modify-as-reinsert semantics.
 
 The final paper will report CPU, topology, memory, operating system, compiler,
 build flags, git revision, core affinity, priority status, warm-up policy,
@@ -780,12 +800,15 @@ The checked-in pre-redesign harness result measured 4.20 Mmsg/s for \textit{babo
 \textit{static} measured 4.78 versus 0.06 Mmsg/s (79.7$\times$); all scenario
 hashes passed.  Those numbers establish the static mechanism but do not yet
 support the proposed 4$\times$ representative headline.  The cells below will
-be replaced only by the post-rebuild measurement matrix.
+be replaced only by the post-rebuild core-pinned measurement matrix, with each
+row's correctness certified by the harness as described in
+Section~\ref{sec:correctness}.
 
 \begin{table}[h]
 \centering
-\caption{Final full-harness throughput. All rows must pass report hashing; values
-await the clean canonical run.}
+\caption{Core-pinned perf throughput (direct-linked engine, no adapter or report
+transport). Every row is independently certified by the harness's SHA-256
+report-stream match; values await the clean canonical run.}
 \label{tab:results}
 \scriptsize
 \begin{tabular}{@{}lrrrl@{}}

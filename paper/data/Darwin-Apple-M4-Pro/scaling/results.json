@@ -1,0 +1,155 @@
+{
+  "metadata": {
+    "created_utc": "2026-07-11T21:59:28.160706+00:00",
+    "generated_by": "scripts/run_scaling.py",
+    "runner_sha256": "8915ee0f228cb58a5f2c383bf1f775727cbccd135037b61b779a7c4e7f47e67f",
+    "label": "Darwin-Apple M4 Pro",
+    "levels": 64,
+    "reps": 3,
+    "sizes": [
+      1000,
+      2000,
+      5000,
+      10000,
+      20000,
+      50000,
+      100000,
+      200000
+    ],
+    "svg_name": "scaling.svg",
+    "machine": {
+      "os": "macOS-15.6-arm64-arm-64bit",
+      "system": "Darwin",
+      "architecture": "arm64",
+      "cpu": "Apple M4 Pro",
+      "logical_cpus": 14,
+      "memory_bytes": 25769803776,
+      "memory_gib": 24.0,
+      "python": "3.9.6"
+    },
+    "compiler": {
+      "cmake_generator": "Ninja",
+      "cmake_build_type": "Release",
+      "cxx_compiler": "/usr/bin/clang++",
+      "cxx_compiler_id": "AppleClang",
+      "cxx_compiler_version": "17.0.0.17000013",
+      "cxx_compiler_version_output": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: arm64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Library/Developer/CommandLineTools/usr/bin",
+      "cxx_flags": "",
+      "cxx_flags_release": "-O3 -DNDEBUG",
+      "cmake_cache_sha256": "da3fd8f7f80d41b2890a4422428f2094860ac6a54908bb7478de9528cb8978ac",
+      "pin_sweep_enabled": "OFF"
+    },
+    "git": {
+      "commit": "858f5a12e25f3b2e6fcf6df0f1c40eb4498e9406",
+      "branch": "main",
+      "dirty": true,
+      "status_available": true
+    },
+    "binaries": {
+      "babo_scaling": {
+        "sha256": "392ae55a76b0d6ff34dc447b046205b56ba3b9b3538bda66315636a446995133"
+      },
+      "liqui_scaling": {
+        "sha256": "8d142d33fa829444a9e1f1c125a0a4f5d2a600a1ca64f92404620fced846b07b"
+      }
+    }
+  },
+  "results": [
+    {
+      "size": 1000,
+      "levels": 64,
+      "depth": 15,
+      "babo_ns": 22.667,
+      "liqui_ns": 60.875,
+      "babo_mps": 44.117,
+      "liqui_mps": 16.4271,
+      "babo_seconds": 2.3e-05,
+      "liqui_seconds": 6.1e-05,
+      "speedup": 2.685622270260731
+    },
+    {
+      "size": 2000,
+      "levels": 64,
+      "depth": 31,
+      "babo_ns": 24.771,
+      "liqui_ns": 88.312,
+      "babo_mps": 40.3698,
+      "liqui_mps": 11.3234,
+      "babo_seconds": 5e-05,
+      "liqui_seconds": 0.000177,
+      "speedup": 3.565136651729845
+    },
+    {
+      "size": 5000,
+      "levels": 64,
+      "depth": 78,
+      "babo_ns": 28.233,
+      "liqui_ns": 177.825,
+      "babo_mps": 35.419,
+      "liqui_mps": 5.6235,
+      "babo_seconds": 0.000141,
+      "liqui_seconds": 0.000889,
+      "speedup": 6.29848050154075
+    },
+    {
+      "size": 10000,
+      "levels": 64,
+      "depth": 156,
+      "babo_ns": 26.337,
+      "liqui_ns": 335.913,
+      "babo_mps": 37.9687,
+      "liqui_mps": 2.977,
+      "babo_seconds": 0.000263,
+      "liqui_seconds": 0.003359,
+      "speedup": 12.754413942362456
+    },
+    {
+      "size": 20000,
+      "levels": 64,
+      "depth": 312,
+      "babo_ns": 26.815,
+      "liqui_ns": 626.162,
+      "babo_mps": 37.2931,
+      "liqui_mps": 1.597,
+      "babo_seconds": 0.000536,
+      "liqui_seconds": 0.012523,
+      "speedup": 23.35118403878426
+    },
+    {
+      "size": 50000,
+      "levels": 64,
+      "depth": 781,
+      "babo_ns": 24.402,
+      "liqui_ns": 1530.737,
+      "babo_mps": 40.9808,
+      "liqui_mps": 0.6533,
+      "babo_seconds": 0.00122,
+      "liqui_seconds": 0.076537,
+      "speedup": 62.72998114908614
+    },
+    {
+      "size": 100000,
+      "levels": 64,
+      "depth": 1562,
+      "babo_ns": 27.382,
+      "liqui_ns": 3357.074,
+      "babo_mps": 36.5197,
+      "liqui_mps": 0.2979,
+      "babo_seconds": 0.002738,
+      "liqui_seconds": 0.335707,
+      "speedup": 122.60149002994667
+    },
+    {
+      "size": 200000,
+      "levels": 64,
+      "depth": 3125,
+      "babo_ns": 44.781,
+      "liqui_ns": 7243.051,
+      "babo_mps": 22.3311,
+      "liqui_mps": 0.1381,
+      "babo_seconds": 0.008956,
+      "liqui_seconds": 1.44861,
+      "speedup": 161.7438422545276
+    }
+  ]
+}
