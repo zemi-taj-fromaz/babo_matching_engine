@@ -169,11 +169,14 @@ def main() -> int:
 
     total = len(scenarios) * len(counts) * len(ENGINES)
     done = 0
-    # data[scenario][count][engine] = cell dict
+    # data[scenario][count][engine] = cell dict.
+    # Engines are measured innermost (babo then liquibook, back-to-back) so both
+    # share the same thermal window for each cell — the speedup ratio must not
+    # depend on how much the CPU drifted between an all-babo and an all-liqui pass.
     data: dict = {s: {c: {} for c in counts} for s in scenarios}
-    for engine, _ in ENGINES:
-        for scenario in scenarios:
-            for count in counts:
+    for scenario in scenarios:
+        for count in counts:
+            for engine, _ in ENGINES:
                 done += 1
                 print(f"  [{done}/{total}] {engine:9s} {DISPLAY.get(scenario, scenario):14s} count={count:>9,}",
                       flush=True)
