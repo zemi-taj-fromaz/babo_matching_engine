@@ -48,21 +48,28 @@ struct Options {
     const char* workload_path = nullptr;
     const char* scenario = "normal";
     int reps = kMeasuredReps;
+    long count = 1'000'000;      // generator NEW-order count (message-scale knob)
 };
 
 void print_usage(const char* exe) {
     std::fprintf(stderr,
         "usage:\n"
         "  %s [workload.bin] [--reps N]\n"
-        "  %s [--scenario static|normal|swing25|flash_crash_40|flash_crash_60|all] [--reps N]\n",
+        "  %s [--scenario ...|all] [--reps N] [--count NEW_ORDERS]\n",
         exe, exe);
 }
 
-bool parse_positive_int(const char* text, int& out) {
+bool parse_bounded_long(const char* text, long lo, long hi, long& out) {
     char* end = nullptr;
     const long value = std::strtol(text, &end, 10);
-    if (!text[0] || *end != '\0' || value <= 0 || value > 1'000'000) return false;
-    out = static_cast<int>(value);
+    if (!text[0] || *end != '\0' || value < lo || value > hi) return false;
+    out = value;
+    return true;
+}
+
+bool parse_positive_int(const char* text, int& out) {
+    long v; if (!parse_bounded_long(text, 1, 1'000'000, v)) return false;
+    out = static_cast<int>(v);
     return true;
 }
 
@@ -71,6 +78,8 @@ bool parse_options(int argc, char** argv, Options& options) {
         const std::string_view arg = argv[i];
         if (arg == "--reps") {
             if (++i >= argc || !parse_positive_int(argv[i], options.reps)) return false;
+        } else if (arg == "--count") {
+            if (++i >= argc || !parse_bounded_long(argv[i], 2, 50'000'000, options.count)) return false;
         } else if (arg == "--scenario") {
             if (++i >= argc) return false;
             options.scenario = argv[i];
@@ -171,19 +180,33 @@ void replay_once(const std::vector<bench::WMsg>& w, std::size_t max_id, std::uin
     for (LO* lo : allocated) delete lo;
 }
 
-double replay_repeated(const std::vector<bench::WMsg>& w, std::size_t max_id, int reps, std::uint32_t& sink) {
+// Times each rep separately (into `per_rep`) and returns the aggregate wall.
+double replay_repeated(const std::vector<bench::WMsg>& w, std::size_t max_id, int reps,
+                       std::uint32_t& sink, std::vector<double>& per_rep) {
+    per_rep.resize(static_cast<std::size_t>(reps));
     const auto t0 = clk::now();
-    for (int rep = 0; rep < reps; ++rep) replay_once(w, max_id, sink);
+    for (int rep = 0; rep < reps; ++rep) {
+        const auto a = clk::now();
+        replay_once(w, max_id, sink);
+        const auto b = clk::now();
+        per_rep[rep] = std::chrono::duration<double>(b - a).count();
+    }
     const auto t1 = clk::now();
     return std::chrono::duration<double>(t1 - t0).count();
 }
 
-void run_workload(const char* label, const std::vector<bench::WMsg>& w, int reps) {
+void run_workload(const char* label, const std::vector<bench::WMsg>& w, int reps,
+                  std::uint64_t num_new) {
     const std::size_t max_id = max_order_id(w);
     std::uint32_t sink = 0;
-    replay_once(w, max_id, sink);                             // warmup
-    const double sec = replay_repeated(w, max_id, reps, sink); // measured hot loop
-    bench::log::result(label, w.size(), reps, sec, sink);
+    replay_once(w, max_id, sink);                              // warmup
+    std::vector<double> per_rep;
+    const double wall = replay_repeated(w, max_id, reps, sink, per_rep);  // measured hot loop
+    std::sort(per_rep.begin(), per_rep.end());
+    const double best   = per_rep.front();
+    const double median = per_rep[per_rep.size() / 2];
+    bench::log::result(label, w.size(), reps, best, median, wall, sink);
+    bench::log::perf_row(kEngineName, label, num_new, w.size(), reps, best, median, wall, sink);
 }
 
 }  // namespace
@@ -204,7 +227,7 @@ int main(int argc, char** argv) {
         const char* path = options.workload_path;
         std::vector<bench::WMsg> w;
         if (!bench::load_workload(path, w)) return 1;
-        run_workload(path, w, options.reps);
+        run_workload(path, w, options.reps, 0);
         return 0;
     }
 
@@ -212,7 +235,10 @@ int main(int argc, char** argv) {
         bench::WorkloadParams params;
         params.volatility = scenario.volatility;
         params.target_swing = scenario.target_swing;
-        run_workload(scenario.name, to_wire_workload(bench::WorkloadGen(params).generate()), options.reps);
+        params.num_new = static_cast<std::uint32_t>(options.count);
+        run_workload(scenario.name,
+                     to_wire_workload(bench::WorkloadGen(params).generate()),
+                     options.reps, static_cast<std::uint64_t>(options.count));
     };
 
     if (std::string_view(options.scenario) == "all") {

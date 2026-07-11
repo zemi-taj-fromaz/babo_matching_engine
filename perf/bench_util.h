@@ -21,6 +21,11 @@
 #    define NOMINMAX             // keep <windows.h> from clobbering std::min/max
 #  endif
 #  include <windows.h>
+#elif defined(__APPLE__)
+#  include <sched.h>
+#  include <pthread.h>
+#  include <mach/mach.h>
+#  include <mach/thread_policy.h>
 #else
 #  include <sched.h>
 #endif
@@ -48,6 +53,23 @@ inline bool pin_to_core(unsigned core) {
 // thread preempts other normal work the scheduler may still place on the core.
 inline bool isolate_core() {
     return SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL) != 0;
+}
+#elif defined(__APPLE__)
+// macOS has no sched_setaffinity. THREAD_AFFINITY_POLICY is a cache-affinity
+// *hint*: honored on Intel Macs, unsupported (KERN_NOT_SUPPORTED) on Apple
+// Silicon — so pinning is best-effort and just reports whether it took. Priority
+// is raised via pthread SCHED_FIFO; best-of-N reps carry the rest of the noise.
+inline bool pin_to_core(unsigned core) {
+    thread_affinity_policy_data_t policy = { static_cast<integer_t>(core + 1) };
+    const thread_port_t mach_thread = pthread_mach_thread_np(pthread_self());
+    return thread_policy_set(mach_thread, THREAD_AFFINITY_POLICY,
+                             reinterpret_cast<thread_policy_t>(&policy),
+                             THREAD_AFFINITY_POLICY_COUNT) == KERN_SUCCESS;
+}
+inline bool isolate_core() {
+    struct sched_param sp;
+    sp.sched_priority = sched_get_priority_max(SCHED_FIFO);
+    return pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp) == 0;
 }
 #else
 inline bool pin_to_core(unsigned core) {

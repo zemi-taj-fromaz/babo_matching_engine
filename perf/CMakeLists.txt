@@ -26,6 +26,11 @@ endfunction()
 add_perf(liqui_perf  liqui_perf_order_book.cpp  liquibook_ref)
 add_perf(babo_perf   babo_perf_order_book.cpp   babobook)        # PIN capacity 64
 
+# Cancel-throughput-vs-resting-book-size sweep (the O(1)-cancel "money figure").
+# Same engine libs, a synthetic prefill+cancel workload; see scaling_common.h.
+add_perf(liqui_scaling  liqui_scaling.cpp  liquibook_ref)
+add_perf(babo_scaling   babo_scaling.cpp   babobook)
+
 # --- opt-in: pin_node capacity sweep (depth ON) -----------------------------
 # One target per non-default capacity. `babo_perf` already represents capacity
 # 64, so the opt-in sweep does not compile a duplicate cap64 binary.

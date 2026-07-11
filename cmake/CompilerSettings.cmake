@@ -10,8 +10,23 @@
 # untouched. NOTE: deliberately no -ffast-math — it would break the workload
 # generator's floating-point determinism and thus the correctness references.
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT MSVC)
-    string(APPEND CMAKE_C_FLAGS_RELEASE   " -O3 -march=native -funroll-loops")
-    string(APPEND CMAKE_CXX_FLAGS_RELEASE " -O3 -march=native -funroll-loops")
+    # Native ISA tuning: -march=native everywhere it is accepted; on Apple Silicon
+    # clang it is rejected, so fall back to -mcpu=native (and if neither is
+    # accepted, skip native tuning rather than fail the configure).
+    include(CheckCXXCompilerFlag)
+    check_cxx_compiler_flag("-march=native" BABO_HAS_MARCH_NATIVE)
+    if (BABO_HAS_MARCH_NATIVE)
+        set(BABO_NATIVE_FLAG "-march=native")
+    else ()
+        check_cxx_compiler_flag("-mcpu=native" BABO_HAS_MCPU_NATIVE)
+        if (BABO_HAS_MCPU_NATIVE)
+            set(BABO_NATIVE_FLAG "-mcpu=native")
+        else ()
+            set(BABO_NATIVE_FLAG "")
+        endif ()
+    endif ()
+    string(APPEND CMAKE_C_FLAGS_RELEASE   " -O3 ${BABO_NATIVE_FLAG} -funroll-loops")
+    string(APPEND CMAKE_CXX_FLAGS_RELEASE " -O3 ${BABO_NATIVE_FLAG} -funroll-loops")
 endif ()
 
 # --- Link-time optimization for Release --------------------------------------

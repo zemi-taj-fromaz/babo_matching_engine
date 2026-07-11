@@ -70,18 +70,46 @@ inline void pin_and_isolate(unsigned core) {
 }
 
 // One scenario's result block. `msgs_per_rep` is the workload size; `reps` the
-// number of replays timed; `wall_s` the total measured wall time.
+// number of replays timed. `best_s` / `median_s` are the fastest and median
+// single-rep wall times (the stable estimators); `wall_s` is the aggregate over
+// all reps (its mean is kept as THROUGHPUT for output-parser compatibility).
 inline void result(const char* scenario, std::uint64_t msgs_per_rep, int reps,
-                    double wall_s, std::uint32_t resting) {
+                    double best_s, double median_s, double wall_s, std::uint32_t resting) {
     const std::uint64_t total = msgs_per_rep * static_cast<std::uint64_t>(reps);
-    const double mps = wall_s > 0.0 ? double(total) / wall_s / 1e6 : 0.0;
+    const double per = static_cast<double>(msgs_per_rep);
+    const double peak_mps = best_s   > 0.0 ? per / best_s   / 1e6 : 0.0;
+    const double med_mps  = median_s > 0.0 ? per / median_s / 1e6 : 0.0;
+    const double mean_mps = wall_s   > 0.0 ? double(total) / wall_s / 1e6 : 0.0;
     std::printf("\n  %s--- %s ------------------------------------%s\n",
                 ansi::bold, scenario, ansi::reset);
     std::printf("      messages      %s x %d reps = %s\n",
                 commas(msgs_per_rep).c_str(), reps, commas(total).c_str());
+    std::printf("      %sPEAK          %.2f M msgs/s%s   %s(best rep, cache-hot)%s\n",
+                ansi::green, peak_mps, ansi::reset, ansi::dim, ansi::reset);
+    std::printf("      median        %.2f M msgs/s\n", med_mps);
     std::printf("      wall time     %.4f s\n", wall_s);
-    std::printf("      %sTHROUGHPUT    %.2f M msgs/s%s\n", ansi::green, mps, ansi::reset);
+    std::printf("      %sTHROUGHPUT    %.2f M msgs/s%s   %s(mean of %d reps)%s\n",
+                ansi::dim, mean_mps, ansi::reset, ansi::dim, reps, ansi::reset);
     std::printf("      resting book  %s  (sink)\n", commas(resting).c_str());
+    std::fflush(stdout);
+}
+
+// Machine-parseable one-liner for the market-matrix runner (stable key=value
+// schema). Emitted alongside the pretty block. num_new is the generator's NEW
+// order count for this point (0 when replaying a .bin of unknown scale).
+inline void perf_row(const char* engine, const char* scenario, std::uint64_t num_new,
+                     std::uint64_t msgs_per_rep, int reps,
+                     double best_s, double median_s, double wall_s, std::uint32_t resting) {
+    const std::uint64_t total = msgs_per_rep * static_cast<std::uint64_t>(reps);
+    const double peak = best_s   > 0.0 ? double(msgs_per_rep) / best_s   / 1e6 : 0.0;
+    const double med  = median_s > 0.0 ? double(msgs_per_rep) / median_s / 1e6 : 0.0;
+    const double mean = wall_s   > 0.0 ? double(total)        / wall_s   / 1e6 : 0.0;
+    std::printf("PERFROW engine=%s scenario=%s num_new=%llu messages=%llu reps=%d "
+                "peak_mps=%.4f median_mps=%.4f mean_mps=%.4f resting=%u\n",
+                engine, scenario,
+                static_cast<unsigned long long>(num_new),
+                static_cast<unsigned long long>(msgs_per_rep), reps,
+                peak, med, mean, resting);
     std::fflush(stdout);
 }
 

@@ -94,6 +94,10 @@ Example output:
 > **Pinning:** the binaries pin to **core 5** and raise real-time priority. If you
 > see `could not raise priority`, run as admin/root for the cleanest numbers (it
 > still works without). To change the core, edit `kBenchCore` in the `perf/*.cpp`.
+> **macOS:** affinity is a best-effort hint (Mach `THREAD_AFFINITY_POLICY`) —
+> honored on Intel Macs, ignored on Apple Silicon, so `could not pin to core 5`
+> there is expected and harmless; best-of-N reps carry the rest. `-march=native`
+> falls back to `-mcpu=native` automatically on Apple Silicon clang.
 
 ### Optional build: the PIN-capacity sweep
 
@@ -141,6 +145,75 @@ Liquibook's static case can make this an overnight run. For a quick installation
 check, use `-Reps 1 -Scenarios normal` on PowerShell or
 `--reps 1 --scenarios normal` on the shell wrapper. Send the generated ZIP under
 `<build>/perf/results/`; do not manually transcribe the table.
+
+---
+
+## Throughput matrix: market regimes × message-scale (the paper figure)
+
+The headline report. It sweeps both engines across the four dynamic market
+scenarios (`normal`, `swing25`, `flash_crash_40`, `flash_crash_60` — `static` is
+skipped; it's the separate scaling experiment below) and ten message scales
+(1k…2M NEW orders), running each cell best-of-N through the core-pinned perf
+binaries and recording the **PEAK** throughput (per-rep min — the stable
+estimator). It emits one bundle: a per-scenario table + throughput-vs-scale line
+chart for both engines, a combined speedup chart, CSV/JSON, and full
+CPU/compiler/git metadata.
+
+```powershell
+# Windows (~5 min on a laptop)
+powershell -ExecutionPolicy Bypass -File scripts\run_market_matrix.ps1 -BuildDir cmake-build-release
+```
+```bash
+# Linux / macOS / git-bash
+scripts/run_market_matrix.sh --build-dir cmake-build-release
+```
+
+Flags: `--scenarios a,b`, `--counts 1000,...,2000000`, `--reps N` (default 10),
+`--metric peak|median`, `--label` (defaults to `OS-CPU`). Absolute `M msgs/s`
+varies by CPU/clock, so the **speedup** column is the cross-machine-comparable
+figure — collect bundles from several machines and drop them side by side. The
+perf binaries also gained `--count N` (the message-scale knob) and now print
+`PEAK` / `median` / mean per scenario, so a single `babo_perf --scenario normal
+--count 500000` is a stable one-off measurement too.
+
+---
+
+## Scaling curve: cancel latency vs resting-book size
+
+The headline mechanism is **O(1) vs O(n) cancel**, and this is the experiment
+that isolates it. Each engine prefills `N` non-crossing resting orders packed
+into a fixed number of price levels `L` (so the depth per contended price is
+`N/L` and grows with `N`), then times cancelling **all N** in a fixed shuffled
+order. Prefill/allocation is off the clock — only the cancel loop is measured.
+
+- `babo_scaling` — babo cancel is O(1) (id→slot hash index); `ns/cancel` stays
+  nearly flat (its gentle rise is pure cache-hierarchy latency as the working
+  set outgrows L2/L3).
+- `liqui_scaling` — liquibook cancels via `find_on_market`, which rescans the
+  contended price level, so `ns/cancel` climbs O(depth) and the gap explodes.
+
+Both are default-built, core-pinned binaries (same options: `--sizes a,b,c`,
+`--levels L`, `--reps R`, `--max M`). Run them directly, or use the portable
+runner, which sweeps both engines, merges to CSV/JSON/Markdown, draws a
+dependency-free log-log SVG, and bundles it with full CPU/compiler/git metadata:
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File scripts\run_scaling.ps1 -BuildDir cmake-build-release
+```
+```bash
+# Linux / macOS / git-bash
+scripts/run_scaling.sh --build-dir cmake-build-release
+```
+
+`--label` defaults to `OS-CPU model` (e.g. `Windows-AMD Ryzen 7 7730U`); pass
+one only to override it.
+Defaults sweep `N` = 1k…200k over `L=64` levels, best of 3 reps (a few seconds;
+liquibook dominates the runtime at the deep end). Add `--max 1000000` for the
+hero point, or `--levels 128` / `--sizes ...` to reshape the curve. The shareable
+ZIP lands under `<build>/perf/results/`. Absolute `ns/cancel` varies by CPU, so
+the **speedup column** (liquibook ns ÷ babo ns) is the cross-machine-comparable
+figure — which is why collecting bundles from several machines is worthwhile.
 
 ---
 
