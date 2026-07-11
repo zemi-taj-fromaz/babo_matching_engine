@@ -163,6 +163,44 @@ Three layers, decoupled by the C ABI:
   engine / depth / core / reps; babo also prints `pin_node capacity`.
 - **Docs.** README + CLAUDE.md rewritten for the above.
 
+### Next up on the WINDOWS machine (handoff — read this first)
+
+The cross-machine paper-data pipeline is built and the **Apple M4 Pro** bundles
+are already committed (see `paper/data/`, commit `1679a0d`). On the Windows PC,
+do these in order:
+
+1. **Tag the data commit so every machine runs identical source**, then push it:
+   ```powershell
+   git tag paper-data-v1
+   git push origin main --tags
+   ```
+   (Skip if `paper-data-v1` already exists — `git tag -l paper-data-v1`.)
+2. **Produce this machine's bundles** (charger in, heavy apps closed):
+   ```powershell
+   git status                      # must be clean → bundles record dirty=false
+   cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
+   cmake --build cmake-build-release --target babo_perf liqui_perf babo_scaling liqui_scaling -j
+   powershell -ExecutionPolicy Bypass -File scripts\run_market_matrix.ps1 -BuildDir cmake-build-release
+   powershell -ExecutionPolicy Bypass -File scripts\run_scaling.ps1        -BuildDir cmake-build-release
+   ```
+   Do NOT change `-Counts` / `-Reps` / `-Scenarios` — cells must match the Mac run.
+3. **Commit the results** the same way the Mac run was committed: unzip each ZIP
+   from `cmake-build-release\perf\results\` into
+   `paper/data/<label>/{market_matrix,scaling}/` (label = the bundle's `results.json`
+   `metadata.label`, e.g. `Windows-AMD-Ryzen-...`), then
+   `python scripts\..\paper\data\aggregate.py` (i.e. `python paper/data/aggregate.py`)
+   to regenerate `paper/data/AGGREGATE.md`, and commit. The `.zip` is gitignored;
+   commit the unzipped folders only.
+4. **Then the payoff:** with Mac (~2×, unpinned Apple Silicon) + Windows (~5×,
+   pinned) side by side, `AGGREGATE.md` gives the real cross-machine speedup table.
+   That contrast is a paper *strength* — the O(1)-vs-O(depth) mechanism holds on
+   both; the multiplier scales inversely with the host's cache/bandwidth (babo is
+   cache-bound, liquibook's `find_on_market` scan is memory-latency-bound). Fold
+   that into the paper's threats-to-validity as a characterization, not a caveat.
+
+Get one or two friends to run step 2–3 too (see `UPUTE_ZA_PRIJATELJA.txt` +
+`paper/data/README.md`) for more machines in the aggregate.
+
 ### To do next session (in order)
 1. **Rebuild from a fresh CMake configure** — NOT done since the spdlog removal and
    the depth-default change. Confirm a clean build + `ctest` green. **Gating item.**
