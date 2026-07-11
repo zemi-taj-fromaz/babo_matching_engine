@@ -1,0 +1,35 @@
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[
+  font=\small,
+  box/.style={draw,rounded corners=2pt,minimum height=9mm,text width=28mm,align=center,fill=blue!5},
+  decision/.style={draw,diamond,aspect=2.35,minimum height=12mm,text width=21mm,align=center,fill=orange!8,inner sep=1pt},
+  outcome/.style={draw,rounded corners=2pt,minimum height=9mm,text width=27mm,align=center,fill=green!7},
+  arrow/.style={-{Latex[length=2mm]},thick},
+  edgeword/.style={font=\scriptsize,fill=white,inner sep=1pt}
+]
+\node[box] (new) at (0,0) {Receive NEW order};
+\node[decision] (cross) at (3.4,0) {Crosses the opposite side?};
+\node[box] (match) at (7.0,0) {Match oldest order at the best opposing price};
+\node[decision] (remaining) at (10.6,0) {Quantity remaining?};
+\node[outcome] (filled) at (14.0,0) {Order fully filled};
+\node[decision] (policy) at (10.6,-2.8) {Remainder policy};
+\node[outcome] (rest) at (5.8,-5.3) {Rest at limit price};
+\node[outcome] (cancel) at (10.6,-5.3) {Cancel remainder\\IOC or failed FOK};
+\node[outcome] (park) at (15.0,-5.3) {Park until trigger\\stop order};
+
+\draw[arrow] (new) -- (cross);
+\draw[arrow] (cross) -- node[edgeword,above]{yes} (match);
+\draw[arrow] (match) -- (remaining);
+\draw[arrow] (remaining) -- node[edgeword,above]{no} (filled);
+\draw[arrow] (remaining) -- node[edgeword,right]{yes} (policy);
+\draw[arrow] (cross.south) |- node[edgeword,pos=.72,above]{no match} (policy.west);
+\draw[arrow] (policy) -| node[edgeword,pos=.72,above]{ordinary limit} (rest.north);
+\draw[arrow] (policy) -- node[edgeword,right]{IOC / FOK} (cancel);
+\draw[arrow] (policy) -| node[edgeword,pos=.72,above]{stop} (park.north);
+\end{tikzpicture}
+\caption{Reader-level order lifecycle. AON/FOK perform an all-or-nothing
+quantity check before allowing partial execution; IOC prevents any unfilled
+remainder from resting.}
+\label{fig:order-lifecycle}
+\end{figure*}

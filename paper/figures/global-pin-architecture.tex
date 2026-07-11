@@ -1,0 +1,65 @@
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[
+  font=\small,
+  desc/.style={draw,rounded corners=2pt,text width=30mm,minimum height=13mm,align=center,fill=blue!6},
+  slot/.style={draw,text width=16mm,minimum height=10mm,align=center,fill=green!7},
+  empty/.style={draw,dashed,text width=16mm,minimum height=10mm,align=center,fill=gray!5},
+  treeedge/.style={thick},
+  neighbor/.style={<->,>=Latex,dashed,blue!70!black,thick},
+  ptr/.style={->,>=Latex,orange!85!black,thick},
+  chain/.style={<->,>=Latex,very thick}
+]
+% Panel A: enough vertical space separates tree edges from neighbor threads.
+\node[font=\bfseries] at (0,7.7) {(a) NARB price index};
+\node[desc] (root) at (0,6.45) {$D_{100}$: price 100\\qty 25, count 2};
+\node[desc] (high) at (-4.0,4.25) {$D_{101}$: price 101\\qty 18, count 2};
+\node[desc] (low) at (4.0,4.25) {$D_{99}$: price 99\\qty 31, count 2};
+\draw[treeedge] (root.south west) -- node[above left,font=\scriptsize]{RB child} (high.north);
+\draw[treeedge] (root.south east) -- node[above right,font=\scriptsize]{RB child} (low.north);
+\draw[neighbor] (high.south) to[out=-70,in=-110]
+  node[below,font=\scriptsize,fill=white]{in-order predecessor / successor} (root.south);
+\draw[neighbor] (root.south) to[out=-70,in=-110] (low.south);
+\node[align=center,font=\scriptsize,text width=130mm] at (0,2.7)
+  {Solid red--black links provide $O(\log P)$ lookup. Dashed neighbor threads
+   move directly to the next better or worse active price in $O(1)$.};
+
+\draw[gray!55] (-8.8,2.15) -- (8.8,2.15);
+
+% Panel B: descriptors align above their ranges, keeping all six pointers separate.
+\node[font=\bfseries] at (0,1.65) {(b) Price-level descriptors delimit the global PIN chain};
+\node[desc] (d101) at (-5.3,0.25) {$D_{101}$\\head $P_0:s_5$; tail $P_0:s_1$};
+\node[desc] (d100) at (0,0.25) {$D_{100}$\\head $P_0:s_3$; tail $P_0:s_0$};
+\node[desc] (d99) at (5.3,0.25) {$D_{99}$\\head $P_1:s_4$; tail $P_1:s_2$};
+
+\node[slot] (s5) at (-7.35,-2.55) {$P_0:s_5$\\101 / A};
+\node[slot,right=0pt of s5] (s1) {$P_0:s_1$\\101 / B};
+\node[slot,right=0pt of s1] (s3) {$P_0:s_3$\\100 / C};
+\node[slot,right=0pt of s3] (s0) {$P_0:s_0$\\100 / D};
+\node[empty,right=0pt of s0] (s6) {$P_0:s_6$\\free};
+\node[draw,fit=(s5)(s6),inner sep=2mm,label={[font=\scriptsize]below:PIN node $P_0$}] (pin0) {};
+
+\node[slot,right=8mm of s6] (t4) {$P_1:s_4$\\99 / E};
+\node[slot,right=0pt of t4] (t2) {$P_1:s_2$\\99 / F};
+\node[empty,right=0pt of t2] (t7) {$P_1:s_7$\\free};
+\node[draw,fit=(t4)(t7),inner sep=2mm,label={[font=\scriptsize]below:PIN node $P_1$}] (pin1) {};
+\draw[chain] (pin0.east) -- node[above,font=\scriptsize,fill=white]{node next / prev} (pin1.west);
+
+\draw[ptr] (d101.south west) -- node[left,font=\scriptsize]{head} (s5.north);
+\draw[ptr] (d101.south east) -- node[right,font=\scriptsize]{tail} (s1.north);
+\draw[ptr] (d100.south west) -- node[left,font=\scriptsize]{head} (s3.north);
+\draw[ptr] (d100.south east) -- node[right,font=\scriptsize]{tail} (s0.north);
+\draw[ptr] (d99.south west) -- node[left,font=\scriptsize]{head} (t4.north);
+\draw[ptr] (d99.south east) -- node[right,font=\scriptsize]{tail} (t2.north);
+
+\node[align=center,font=\scriptsize,text width=155mm] at (0,-4.65)
+  {Priority runs left to right through intrusive slot links. Each slot points
+   back to its descriptor, while the order-id index maps an external id directly
+   to \{PIN node, slot\}. A physical PIN node may hold multiple price levels.};
+\end{tikzpicture}
+\caption{Two complementary views of the architecture. The NARB Tree owns one
+price-level descriptor per active price. Descriptor head/tail pointers identify
+that price's logical range inside the global per-side PIN chain; order payloads
+live only in stable PIN slots.}
+\label{fig:global-pin-chain}
+\end{figure*}

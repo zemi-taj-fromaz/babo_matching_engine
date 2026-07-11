@@ -8,11 +8,34 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $runner = Join-Path $PSScriptRoot "run_portable_perf.py"
-$python = Get-Command python3 -ErrorAction SilentlyContinue
-$prefix = @()
-if (-not $python) { $python = Get-Command python -ErrorAction SilentlyContinue }
-if (-not $python) { $python = Get-Command py -ErrorAction SilentlyContinue; if ($python) { $prefix = @("-3") } }
-if (-not $python) { throw "Python 3 not found. Install Python 3 or put it on PATH." }
+function Find-WorkingPython {
+    $candidates = @(
+        @{ Name = "py";      Prefix = @("-3") },
+        @{ Name = "python";  Prefix = @() },
+        @{ Name = "python3"; Prefix = @() }
+    )
+    foreach ($candidate in $candidates) {
+        $command = Get-Command $candidate.Name -ErrorAction SilentlyContinue
+        if (-not $command) { continue }
+        try {
+            $candidatePrefix = @($candidate.Prefix)
+            & $command.Source $candidatePrefix -c "import sys; assert sys.version_info.major == 3" 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                return @{ Command = $command; Prefix = $candidate.Prefix }
+            }
+        } catch {
+            # App-execution aliases can be discoverable but fail when launched.
+        }
+    }
+    return $null
+}
+
+$pythonChoice = Find-WorkingPython
+if (-not $pythonChoice) {
+    throw "Working Python 3 not found. The Windows 'py -3' launcher, 'python', and 'python3' were all tried."
+}
+$python = $pythonChoice.Command
+$prefix = $pythonChoice.Prefix
 $argsList = $prefix + @($runner, "--build-dir", $BuildDir, "--reps", $Reps)
 $argsList += @("--scenarios", $Scenarios)
 if ($Label) { $argsList += @("--label", $Label) }
