@@ -41,10 +41,10 @@ cmake --build cmake-build-release -j
 
 > **Windows + LLVM/clang:** add `-DCMAKE_RC_COMPILER="C:/Program Files/LLVM/bin/llvm-rc.exe"` to the configure step.
 
-The default build is depth-on and lean. Two optional flags add experiment binaries
-(see [below](#optional-builds-the-depth-comparison--the-pin-sweep)):
-`-DBABO_BUILD_NODEPTH=ON` (depth-off variants) and `-DBABO_BUILD_PIN_SWEEP=ON`
-(the `pin_node` capacity sweep).
+The default build contains one canonical babobook configuration: pull-based depth
+and PIN capacity 64. `-DBABO_BUILD_PIN_SWEEP=ON` optionally adds the non-default
+capacity binaries; no duplicate no-depth matrix is built because the optimized
+pull-based depth showed no meaningful throughput difference.
 
 That's it. The **easiest way to see it work** is the standalone perf binaries
 (next section) — no scripts, no setup, just run one.
@@ -78,7 +78,7 @@ Example output:
 
 ```
 ==============================================================
-  babobook   |   depth OFF
+  babobook   |   depth ON
   core 5   |   100 reps   |   1 warmup, then measured
 ==============================================================
   - pinned to core 5
@@ -95,31 +95,52 @@ Example output:
 > see `could not raise priority`, run as admin/root for the cleanest numbers (it
 > still works without). To change the core, edit `kBenchCore` in the `perf/*.cpp`.
 
-### Optional builds: the depth comparison & the pin sweep
+### Optional build: the PIN-capacity sweep
 
-Depth is **on by default** — because babo doesn't maintain it eagerly, it
-**derives** it on demand by walking the tree's top-N price levels (O(N) per query,
-nothing on the hot path), so publishing depth is nearly free. liquibook's
-`std::multimap` book can't enumerate ordered levels cheaply and pays per-op. To
-see that gap yourself, configure with the depth-OFF variants and compare:
-
-```bash
-cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release -DBABO_BUILD_NODEPTH=ON
-cmake --build cmake-build-release -j
-# then compare, e.g.:  babo_perf (depth) vs babo_nodepth_perf,  liqui_perf vs liqui_nodepth_perf
-```
-
-Depth is a compile-time toggle (`BABO_NO_DEPTH` / `LIQUI_NO_DEPTH`), so both builds
-of each engine come from the exact same source.
-
-A second flag builds a **`pin_node` capacity sweep** — `babo_cap{16,32,64,128}_perf`
-— to compare how orders-per-node affects cache behaviour:
+Pull-based depth is part of the canonical build. The optional flag builds
+`babo_cap{16,32,128}_perf`; the default `babo_perf` is the capacity-64 point:
 
 ```bash
 cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release -DBABO_BUILD_PIN_SWEEP=ON
 cmake --build cmake-build-release -j
-for c in 16 32 64 128; do ./cmake-build-release/perf/babo_cap${c}_perf --scenario normal --reps 20; done
+for c in 16 32 128; do ./cmake-build-release/perf/babo_cap${c}_perf --scenario normal --reps 20; done
+# compare those with the canonical capacity-64 ./cmake-build-release/perf/babo_perf
 ```
+
+The measured capacities did not produce a meaningful throughput difference; the
+sweep is retained as a robustness check, not as a tuned source of the headline result.
+
+---
+
+## Portable compiler/OS result bundle
+
+The portable runner executes both canonical perf binaries through all five market
+states, using one warmup plus 100 measured replays per state. It generates a
+shareable ZIP containing Markdown, CSV, JSON, raw console output, environment
+metadata, git revision/dirty status, compiler and CMake configuration, binary
+SHA-256 hashes, and a manifest.
+
+Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run_portable_perf.ps1 `
+  -BuildDir cmake-build-release `
+  -Label "alice-windows-clang"
+```
+
+Linux/macOS:
+
+```bash
+scripts/run_portable_perf.sh \
+  --build-dir cmake-build-release \
+  --label "alice-linux-gcc"
+```
+
+The default is deliberately the full `5 scenarios × 100 reps × 2 books` matrix.
+Liquibook's static case can make this an overnight run. For a quick installation
+check, use `-Reps 1 -Scenarios normal` on PowerShell or
+`--reps 1 --scenarios normal` on the shell wrapper. Send the generated ZIP under
+`<build>/perf/results/`; do not manually transcribe the table.
 
 ---
 
@@ -173,10 +194,7 @@ Options: `--engine` (adapter under test, relative to the benchmark dir),
 `--baseline` (defaults to the built liquibook), `--bench-dir`, `--count` (default
 1,000,000), `--reps` (default 3).
 
-> `babobook_adapter` and `liquibook_adapter` are the depth-on (default) builds. If
-> you configured with `-DBABO_BUILD_NODEPTH=ON`, the lean `babobook_nodepth_adapter`
-> / `liquibook_nodepth_adapter` are also available — point `--engine` / `--baseline`
-> at whichever pair you want to compare.
+`babobook_adapter` and `liquibook_adapter` are the single canonical adapter builds.
 
 **Note:** `static` at 1M is slow for liquibook *by design* (the O(n) collapse).
 Use `--reps 1` for a quick first pass.
@@ -224,9 +242,9 @@ the state audit to `PASS`.
 | `libs/babobook/` | the **babo** engine — `matching_book<SIZE, TRADE_CAP>`, header-only + one `.cpp` |
 | `libs/liquibook/` | the vendored reference engine (frozen) |
 | `benchmark/` | the plugin **harness** + the C-ABI contract (`api/matching_engine_api.h`) |
-| `benchmark/adapters/` | each engine wrapped behind the ABI as a shared lib (depth-on/off builds) |
-| `perf/` | the four standalone, core-pinned throughput binaries |
-| `scripts/` | `regen_references` + `compare_engines` (`.ps1` / `.sh`) |
+| `benchmark/adapters/` | each order book wrapped behind the ABI as a canonical shared lib |
+| `perf/` | two canonical, core-pinned throughput binaries plus opt-in capacity variants |
+| `scripts/` | correctness, comparison, payload-scaling, and portable result-bundle runners |
 | `test/` | unit tests (`babo_unit`, `liqui_unit`) |
 
 ### How babo is fast
@@ -246,7 +264,7 @@ the state audit to `PASS`.
 ## TL;DR
 
 1. **Build:** `cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release && cmake --build cmake-build-release -j`
-2. **Try it:** `./cmake-build-release/perf/babo_perf --scenario all` (and the other three perf binaries).
+2. **Try it:** run both `babo_perf --scenario all` and `liqui_perf --scenario all`.
 3. **Compare rigorously:** `regen_references` then `compare_engines` (`--bench-dir <build>/benchmark`).
 4. **Verify honesty (once):** `harness --engine ./babobook_adapter.<so|dll|dylib> --mode audit`.
 5. **Tests:** `ctest --test-dir cmake-build-release --output-on-failure`.

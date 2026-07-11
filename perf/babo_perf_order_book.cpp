@@ -30,8 +30,9 @@ using clk    = std::chrono::steady_clock;
 static constexpr unsigned kBenchCore = 5;      // change to a free physical core
 static constexpr int kMeasuredReps = 100;       // dilutes startup/load/print noise in perf stat
 
-// Depth ON/OFF is a compile-time toggle (see perf/CMakeLists.txt): babo_perf is
-// built with -DBABO_NO_DEPTH (lean), babo_depth_perf without it (maintains depth).
+// Canonical build: pull-based depth ON. CMake does not build a duplicate
+// no-depth perf matrix because it measured no meaningful difference after the
+// pull-based optimization.
 static constexpr const char* kEngineName = "babobook";
 #ifdef BABO_NO_DEPTH
 static constexpr bool kDepthOn = false;
