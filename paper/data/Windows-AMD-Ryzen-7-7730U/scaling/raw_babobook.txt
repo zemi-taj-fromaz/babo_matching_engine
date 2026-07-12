@@ -1,0 +1,33 @@
+
+[1m[36m==============================================================[0m
+[1m[36m  babobook   |   depth ON[0m
+[1m[36m  core 5   |   3 reps   |   1 warmup, then measured[0m
+[1m[36m==============================================================[0m
+  [2mpin_node capacity: 64[0m
+  [2mexperiment: cancel throughput vs resting-book size[0m
+  - pinned to core 5
+  - raised to real-time priority (isolating the core)
+
+  [1msize 1,000[0m   [2mdepth ~15/lvl (64 lvls)[0m   [1;32mcancel 14.14 M/s[0m   70.7 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=babobook size=1000 levels=64 depth=15 cancels=1000 seconds=0.000071 mps=14.1443 ns_per_cancel=70.700
+
+  [1msize 2,000[0m   [2mdepth ~31/lvl (64 lvls)[0m   [1;32mcancel 11.29 M/s[0m   88.6 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=babobook size=2000 levels=64 depth=31 cancels=2000 seconds=0.000177 mps=11.2867 ns_per_cancel=88.600
+
+  [1msize 5,000[0m   [2mdepth ~78/lvl (64 lvls)[0m   [1;32mcancel 8.94 M/s[0m   111.9 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=babobook size=5000 levels=64 depth=78 cancels=5000 seconds=0.000559 mps=8.9366 ns_per_cancel=111.900
+
+  [1msize 10,000[0m   [2mdepth ~156/lvl (64 lvls)[0m   [1;32mcancel 7.82 M/s[0m   127.8 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=babobook size=10000 levels=64 depth=156 cancels=10000 seconds=0.001278 mps=7.8217 ns_per_cancel=127.850
+
+  [1msize 20,000[0m   [2mdepth ~312/lvl (64 lvls)[0m   [1;32mcancel 7.97 M/s[0m   125.5 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=babobook size=20000 levels=64 depth=312 cancels=20000 seconds=0.002510 mps=7.9694 ns_per_cancel=125.480
+
+  [1msize 50,000[0m   [2mdepth ~781/lvl (64 lvls)[0m   [1;32mcancel 6.37 M/s[0m   156.9 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=babobook size=50000 levels=64 depth=781 cancels=50000 seconds=0.007846 mps=6.3723 ns_per_cancel=156.928
+
+  [1msize 100,000[0m   [2mdepth ~1,562/lvl (64 lvls)[0m   [1;32mcancel 2.66 M/s[0m   375.6 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=babobook size=100000 levels=64 depth=1562 cancels=100000 seconds=0.037560 mps=2.6624 ns_per_cancel=375.601
+
+  [1msize 200,000[0m   [2mdepth ~3,125/lvl (64 lvls)[0m   [1;32mcancel 2.80 M/s[0m   357.4 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=babobook size=200000 levels=64 depth=3125 cancels=200000 seconds=0.071474 mps=2.7982 ns_per_cancel=357.369

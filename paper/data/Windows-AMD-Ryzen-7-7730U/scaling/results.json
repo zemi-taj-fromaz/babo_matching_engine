@@ -1,0 +1,155 @@
+{
+  "metadata": {
+    "created_utc": "2026-07-12T09:29:27.444750+00:00",
+    "generated_by": "scripts/run_scaling.py",
+    "runner_sha256": "8915ee0f228cb58a5f2c383bf1f775727cbccd135037b61b779a7c4e7f47e67f",
+    "label": "Windows-AMD Ryzen 7 7730U",
+    "levels": 64,
+    "reps": 3,
+    "sizes": [
+      1000,
+      2000,
+      5000,
+      10000,
+      20000,
+      50000,
+      100000,
+      200000
+    ],
+    "svg_name": "scaling.svg",
+    "machine": {
+      "os": "Windows-11-10.0.26200-SP0",
+      "system": "Windows",
+      "architecture": "AMD64",
+      "cpu": "AMD Ryzen 7 7730U with Radeon Graphics",
+      "logical_cpus": 16,
+      "memory_bytes": 14861852672,
+      "memory_gib": 13.84,
+      "python": "3.12.2"
+    },
+    "compiler": {
+      "cmake_generator": "Ninja",
+      "cmake_build_type": "Release",
+      "cxx_compiler": "C:/Program Files/LLVM/bin/clang++.exe",
+      "cxx_compiler_id": "Clang",
+      "cxx_compiler_version": "22.1.0",
+      "cxx_compiler_version_output": "clang version 22.1.0 (https://github.com/llvm/llvm-project 4434dabb69916856b824f68a64b029c67175e532)\nTarget: x86_64-pc-windows-msvc\nThread model: posix\nInstalledDir: C:\\Program Files\\LLVM\\bin",
+      "cxx_flags": "",
+      "cxx_flags_release": "-O3 -DNDEBUG",
+      "cmake_cache_sha256": "c628ae74d3311f3e3f2934a88637a6419359d44b3bfad7aee5a70fc74752a205",
+      "pin_sweep_enabled": "OFF"
+    },
+    "git": {
+      "commit": "4ee60763d421accfea21f1003f7acd90002b11c1",
+      "branch": "main",
+      "dirty": true,
+      "status_available": true
+    },
+    "binaries": {
+      "babo_scaling": {
+        "sha256": "ac478bc989b6b4c7bc9548feec469c7fbc93419b80b113506213ae14262f2d2a"
+      },
+      "liqui_scaling": {
+        "sha256": "b0c9a6f7af7c8b62e93041f28ba76e6d42c84e0ab6b823c079ae1e2611010d71"
+      }
+    }
+  },
+  "results": [
+    {
+      "size": 1000,
+      "levels": 64,
+      "depth": 15,
+      "babo_ns": 70.7,
+      "liqui_ns": 318.4,
+      "babo_mps": 14.1443,
+      "liqui_mps": 3.1407,
+      "babo_seconds": 7.1e-05,
+      "liqui_seconds": 0.000318,
+      "speedup": 4.503536067892503
+    },
+    {
+      "size": 2000,
+      "levels": 64,
+      "depth": 31,
+      "babo_ns": 88.6,
+      "liqui_ns": 413.2,
+      "babo_mps": 11.2867,
+      "liqui_mps": 2.4201,
+      "babo_seconds": 0.000177,
+      "liqui_seconds": 0.000826,
+      "speedup": 4.663656884875847
+    },
+    {
+      "size": 5000,
+      "levels": 64,
+      "depth": 78,
+      "babo_ns": 111.9,
+      "liqui_ns": 664.08,
+      "babo_mps": 8.9366,
+      "liqui_mps": 1.5058,
+      "babo_seconds": 0.000559,
+      "liqui_seconds": 0.00332,
+      "speedup": 5.934584450402145
+    },
+    {
+      "size": 10000,
+      "levels": 64,
+      "depth": 156,
+      "babo_ns": 127.85,
+      "liqui_ns": 1167.45,
+      "babo_mps": 7.8217,
+      "liqui_mps": 0.8566,
+      "babo_seconds": 0.001278,
+      "liqui_seconds": 0.011675,
+      "speedup": 9.131403989049668
+    },
+    {
+      "size": 20000,
+      "levels": 64,
+      "depth": 312,
+      "babo_ns": 125.48,
+      "liqui_ns": 2341.48,
+      "babo_mps": 7.9694,
+      "liqui_mps": 0.4271,
+      "babo_seconds": 0.00251,
+      "liqui_seconds": 0.04683,
+      "speedup": 18.660184890022315
+    },
+    {
+      "size": 50000,
+      "levels": 64,
+      "depth": 781,
+      "babo_ns": 156.928,
+      "liqui_ns": 6765.622,
+      "babo_mps": 6.3723,
+      "liqui_mps": 0.1478,
+      "babo_seconds": 0.007846,
+      "liqui_seconds": 0.338281,
+      "speedup": 43.11290528140294
+    },
+    {
+      "size": 100000,
+      "levels": 64,
+      "depth": 1562,
+      "babo_ns": 375.601,
+      "liqui_ns": 22406.053,
+      "babo_mps": 2.6624,
+      "liqui_mps": 0.0446,
+      "babo_seconds": 0.03756,
+      "liqui_seconds": 2.240605,
+      "speedup": 59.65386939864377
+    },
+    {
+      "size": 200000,
+      "levels": 64,
+      "depth": 3125,
+      "babo_ns": 357.369,
+      "liqui_ns": 56672.446,
+      "babo_mps": 2.7982,
+      "liqui_mps": 0.0176,
+      "babo_seconds": 0.071474,
+      "liqui_seconds": 11.334489,
+      "speedup": 158.5824344025363
+    }
+  ]
+}
