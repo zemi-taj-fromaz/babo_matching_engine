@@ -25,6 +25,20 @@ PREDUVJETI
 VAZNO PRIJE POKRETANJA:
 - UKOPCAJ PUNJAC. Na bateriji CPU throttla i brojevi su besmisleni.
 - Zatvori teske programe (browser s 100 tabova, igre...). Laptop nek se hladi.
+- ISKLJUCI CPU BOOST (fiksiraj clock). Bez toga clock skace ~2x (base<->boost)
+  i isti test daje cas 8 cas 17 M/s. Fiksiran clock = reproducibilni brojevi.
+
+  Windows (PowerShell; ako "Access denied" -> pokreni kao Administrator):
+    powercfg /setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PERFBOOSTMODE 0
+    powercfg /setactive SCHEME_CURRENT
+  Provjeri: babo_perf --scenario normal --reps 20  -> mora biti ravno (~8), bez skokova na 17.
+  VRATI kad zavrsis:
+    powercfg /setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PERFBOOSTMODE 2
+    powercfg /setactive SCHEME_CURRENT
+
+  Linux:   echo 0 | sudo tee /sys/devices/system/cpu/cpufreq/boost   (vrati: echo 1)
+           (Intel pstate: echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo)
+  macOS:   nema tu kontrolu -> samo mjeri na stock, spomeni da je Apple Silicon.
 
 Raspakiraj projekt i otvori terminal u root folderu projekta.
 

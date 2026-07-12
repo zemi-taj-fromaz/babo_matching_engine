@@ -785,9 +785,29 @@ Release builds use C++20, O3/native ISA tuning and loop unrolling where the GNU
 driver is used, plus LTO when supported.  Both order books receive the same binary
 workload through the same C ABI and perform the same modify-as-reinsert semantics.
 
+\paragraph{Frequency stability.}  Absolute throughput tracks the core's operating
+frequency, which the hardware scales with thermal and power state.  On the mobile
+parts used here the base-to-boost range is roughly $2\times$ (about $2.0$ vs.\
+$4.5$~GHz on the Ryzen~7~7730U), so an unconstrained core reports the \emph{same}
+workload at ${\approx}8$ or ${\approx}17$~M~messages/s depending only on how long
+it has been under load: short boost bursts are not sustainable across a
+multi-minute sweep and decay to the base clock as the die heats.  We therefore
+disable CPU boost for measurement and record every cell at the fixed base clock
+(Windows \texttt{powercfg PERFBOOSTMODE=0} on the AMD host; the analogous
+processor-power policy elsewhere), retaining core pinning and elevated priority as
+above.  A fixed clock does not change the \emph{speedup}---a ratio measured at a
+common frequency---but it removes a systematic bias: the two engines are timed
+back to back within each cell, and because a slower engine's longer run would
+otherwise accumulate more thermal throttling than a faster engine's, a
+boost-enabled measurement inflates the ratio toward the faster engine.  Apple
+Silicon exposes neither core pinning nor a boost lock, so those hosts are measured
+at stock frequency policy and reported as a distinct, harder measurement
+condition.
+
 The final paper will report CPU, topology, memory, operating system, compiler,
-build flags, git revision, core affinity, priority status, warm-up policy,
-repetitions, aggregation statistic, and run-to-run dispersion.  Correctness and
+build flags, git revision, core affinity, priority status, processor frequency
+policy (CPU boost disabled, fixed base clock), warm-up policy, repetitions,
+aggregation statistic, and run-to-run dispersion.  Correctness and
 audit status accompany every reported comparison.  The benchmark must be rerun
 after the recent pull-based depth change; old saved results are retained only as
 development evidence, not silently promoted to final measurements.
