@@ -7,26 +7,26 @@
   [33m- could not pin to core 5[0m
   - raised to real-time priority (isolating the core)
 
-  [1msize 1,000[0m   [2mdepth ~15/lvl (64 lvls)[0m   [1;32mcancel 16.43 M/s[0m   60.9 ns/cancel   [2m(best of 3)[0m
-SCALEROW engine=liquibook size=1000 levels=64 depth=15 cancels=1000 seconds=0.000061 mps=16.4271 ns_per_cancel=60.875
+  [1msize 1,000[0m   [2mdepth ~15/lvl (64 lvls)[0m   [1;32mcancel 8.81 M/s[0m   113.5 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=1000 levels=64 depth=15 cancels=1000 seconds=0.000114 mps=8.8074 ns_per_cancel=113.541
 
-  [1msize 2,000[0m   [2mdepth ~31/lvl (64 lvls)[0m   [1;32mcancel 11.32 M/s[0m   88.3 ns/cancel   [2m(best of 3)[0m
-SCALEROW engine=liquibook size=2000 levels=64 depth=31 cancels=2000 seconds=0.000177 mps=11.3234 ns_per_cancel=88.312
+  [1msize 2,000[0m   [2mdepth ~31/lvl (64 lvls)[0m   [1;32mcancel 6.59 M/s[0m   151.7 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=2000 levels=64 depth=31 cancels=2000 seconds=0.000303 mps=6.5925 ns_per_cancel=151.688
 
-  [1msize 5,000[0m   [2mdepth ~78/lvl (64 lvls)[0m   [1;32mcancel 5.62 M/s[0m   177.8 ns/cancel   [2m(best of 3)[0m
-SCALEROW engine=liquibook size=5000 levels=64 depth=78 cancels=5000 seconds=0.000889 mps=5.6235 ns_per_cancel=177.825
+  [1msize 5,000[0m   [2mdepth ~78/lvl (64 lvls)[0m   [1;32mcancel 3.87 M/s[0m   258.2 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=5000 levels=64 depth=78 cancels=5000 seconds=0.001291 mps=3.8736 ns_per_cancel=258.158
 
-  [1msize 10,000[0m   [2mdepth ~156/lvl (64 lvls)[0m   [1;32mcancel 2.98 M/s[0m   335.9 ns/cancel   [2m(best of 3)[0m
-SCALEROW engine=liquibook size=10000 levels=64 depth=156 cancels=10000 seconds=0.003359 mps=2.9770 ns_per_cancel=335.913
+  [1msize 10,000[0m   [2mdepth ~156/lvl (64 lvls)[0m   [1;32mcancel 2.28 M/s[0m   437.9 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=10000 levels=64 depth=156 cancels=10000 seconds=0.004379 mps=2.2838 ns_per_cancel=437.867
 
-  [1msize 20,000[0m   [2mdepth ~312/lvl (64 lvls)[0m   [1;32mcancel 1.60 M/s[0m   626.2 ns/cancel   [2m(best of 3)[0m
-SCALEROW engine=liquibook size=20000 levels=64 depth=312 cancels=20000 seconds=0.012523 mps=1.5970 ns_per_cancel=626.162
+  [1msize 20,000[0m   [2mdepth ~312/lvl (64 lvls)[0m   [1;32mcancel 1.54 M/s[0m   647.8 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=20000 levels=64 depth=312 cancels=20000 seconds=0.012957 mps=1.5436 ns_per_cancel=647.831
 
-  [1msize 50,000[0m   [2mdepth ~781/lvl (64 lvls)[0m   [1;32mcancel 0.65 M/s[0m   1530.7 ns/cancel   [2m(best of 3)[0m
-SCALEROW engine=liquibook size=50000 levels=64 depth=781 cancels=50000 seconds=0.076537 mps=0.6533 ns_per_cancel=1530.737
+  [1msize 50,000[0m   [2mdepth ~781/lvl (64 lvls)[0m   [1;32mcancel 0.61 M/s[0m   1646.0 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=50000 levels=64 depth=781 cancels=50000 seconds=0.082298 mps=0.6075 ns_per_cancel=1645.968
 
-  [1msize 100,000[0m   [2mdepth ~1,562/lvl (64 lvls)[0m   [1;32mcancel 0.30 M/s[0m   3357.1 ns/cancel   [2m(best of 3)[0m
-SCALEROW engine=liquibook size=100000 levels=64 depth=1562 cancels=100000 seconds=0.335707 mps=0.2979 ns_per_cancel=3357.074
+  [1msize 100,000[0m   [2mdepth ~1,562/lvl (64 lvls)[0m   [1;32mcancel 0.30 M/s[0m   3333.8 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=100000 levels=64 depth=1562 cancels=100000 seconds=0.333376 mps=0.3000 ns_per_cancel=3333.761
 
-  [1msize 200,000[0m   [2mdepth ~3,125/lvl (64 lvls)[0m   [1;32mcancel 0.14 M/s[0m   7243.1 ns/cancel   [2m(best of 3)[0m
-SCALEROW engine=liquibook size=200000 levels=64 depth=3125 cancels=200000 seconds=1.448610 mps=0.1381 ns_per_cancel=7243.051
+  [1msize 200,000[0m   [2mdepth ~3,125/lvl (64 lvls)[0m   [1;32mcancel 0.14 M/s[0m   7153.3 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=200000 levels=64 depth=3125 cancels=200000 seconds=1.430653 mps=0.1398 ns_per_cancel=7153.265

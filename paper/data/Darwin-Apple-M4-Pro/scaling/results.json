@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "created_utc": "2026-07-11T21:59:28.160706+00:00",
+    "created_utc": "2026-07-16T15:40:27.953436+00:00",
     "generated_by": "scripts/run_scaling.py",
     "runner_sha256": "8915ee0f228cb58a5f2c383bf1f775727cbccd135037b61b779a7c4e7f47e67f",
     "label": "Darwin-Apple M4 Pro",
@@ -40,9 +40,9 @@
       "pin_sweep_enabled": "OFF"
     },
     "git": {
-      "commit": "858f5a12e25f3b2e6fcf6df0f1c40eb4498e9406",
+      "commit": "4ee60763d421accfea21f1003f7acd90002b11c1",
       "branch": "main",
-      "dirty": true,
+      "dirty": false,
       "status_available": true
     },
     "binaries": {
@@ -59,97 +59,97 @@
       "size": 1000,
       "levels": 64,
       "depth": 15,
-      "babo_ns": 22.667,
-      "liqui_ns": 60.875,
-      "babo_mps": 44.117,
-      "liqui_mps": 16.4271,
-      "babo_seconds": 2.3e-05,
-      "liqui_seconds": 6.1e-05,
-      "speedup": 2.685622270260731
+      "babo_ns": 50.0,
+      "liqui_ns": 113.541,
+      "babo_mps": 20.0,
+      "liqui_mps": 8.8074,
+      "babo_seconds": 5e-05,
+      "liqui_seconds": 0.000114,
+      "speedup": 2.27082
     },
     {
       "size": 2000,
       "levels": 64,
       "depth": 31,
-      "babo_ns": 24.771,
-      "liqui_ns": 88.312,
-      "babo_mps": 40.3698,
-      "liqui_mps": 11.3234,
-      "babo_seconds": 5e-05,
-      "liqui_seconds": 0.000177,
-      "speedup": 3.565136651729845
+      "babo_ns": 46.375,
+      "liqui_ns": 151.688,
+      "babo_mps": 21.5633,
+      "liqui_mps": 6.5925,
+      "babo_seconds": 9.3e-05,
+      "liqui_seconds": 0.000303,
+      "speedup": 3.270900269541779
     },
     {
       "size": 5000,
       "levels": 64,
       "depth": 78,
-      "babo_ns": 28.233,
-      "liqui_ns": 177.825,
-      "babo_mps": 35.419,
-      "liqui_mps": 5.6235,
-      "babo_seconds": 0.000141,
-      "liqui_seconds": 0.000889,
-      "speedup": 6.29848050154075
+      "babo_ns": 53.617,
+      "liqui_ns": 258.158,
+      "babo_mps": 18.6509,
+      "liqui_mps": 3.8736,
+      "babo_seconds": 0.000268,
+      "liqui_seconds": 0.001291,
+      "speedup": 4.8148534979577375
     },
     {
       "size": 10000,
       "levels": 64,
       "depth": 156,
-      "babo_ns": 26.337,
-      "liqui_ns": 335.913,
-      "babo_mps": 37.9687,
-      "liqui_mps": 2.977,
-      "babo_seconds": 0.000263,
-      "liqui_seconds": 0.003359,
-      "speedup": 12.754413942362456
+      "babo_ns": 46.562,
+      "liqui_ns": 437.867,
+      "babo_mps": 21.4765,
+      "liqui_mps": 2.2838,
+      "babo_seconds": 0.000466,
+      "liqui_seconds": 0.004379,
+      "speedup": 9.403956015635067
     },
     {
       "size": 20000,
       "levels": 64,
       "depth": 312,
-      "babo_ns": 26.815,
-      "liqui_ns": 626.162,
-      "babo_mps": 37.2931,
-      "liqui_mps": 1.597,
-      "babo_seconds": 0.000536,
-      "liqui_seconds": 0.012523,
-      "speedup": 23.35118403878426
+      "babo_ns": 37.471,
+      "liqui_ns": 647.831,
+      "babo_mps": 26.6874,
+      "liqui_mps": 1.5436,
+      "babo_seconds": 0.000749,
+      "liqui_seconds": 0.012957,
+      "speedup": 17.28886338768648
     },
     {
       "size": 50000,
       "levels": 64,
       "depth": 781,
-      "babo_ns": 24.402,
-      "liqui_ns": 1530.737,
-      "babo_mps": 40.9808,
-      "liqui_mps": 0.6533,
-      "babo_seconds": 0.00122,
-      "liqui_seconds": 0.076537,
-      "speedup": 62.72998114908614
+      "babo_ns": 29.872,
+      "liqui_ns": 1645.968,
+      "babo_mps": 33.4765,
+      "liqui_mps": 0.6075,
+      "babo_seconds": 0.001494,
+      "liqui_seconds": 0.082298,
+      "speedup": 55.10069630423139
     },
     {
       "size": 100000,
       "levels": 64,
       "depth": 1562,
-      "babo_ns": 27.382,
-      "liqui_ns": 3357.074,
-      "babo_mps": 36.5197,
-      "liqui_mps": 0.2979,
-      "babo_seconds": 0.002738,
-      "liqui_seconds": 0.335707,
-      "speedup": 122.60149002994667
+      "babo_ns": 30.534,
+      "liqui_ns": 3333.761,
+      "babo_mps": 32.7502,
+      "liqui_mps": 0.3,
+      "babo_seconds": 0.003053,
+      "liqui_seconds": 0.333376,
+      "speedup": 109.18192834217594
     },
     {
       "size": 200000,
       "levels": 64,
       "depth": 3125,
-      "babo_ns": 44.781,
-      "liqui_ns": 7243.051,
-      "babo_mps": 22.3311,
-      "liqui_mps": 0.1381,
-      "babo_seconds": 0.008956,
-      "liqui_seconds": 1.44861,
-      "speedup": 161.7438422545276
+      "babo_ns": 58.032,
+      "liqui_ns": 7153.265,
+      "babo_mps": 17.2318,
+      "liqui_mps": 0.1398,
+      "babo_seconds": 0.011606,
+      "liqui_seconds": 1.430653,
+      "speedup": 123.26414736696996
     }
   ]
 }

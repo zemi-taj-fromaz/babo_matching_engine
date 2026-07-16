@@ -7,13 +7,13 @@
 <line class='grid' x1='85' y1='367.2' x2='725' y2='367.2'/>
 <text x='77' y='371.2' text-anchor='end' font-size='11'>8.2</text>
 <line class='grid' x1='85' y1='288.4' x2='725' y2='288.4'/>
-<text x='77' y='292.4' text-anchor='end' font-size='11'>16.5</text>
+<text x='77' y='292.4' text-anchor='end' font-size='11'>16.3</text>
 <line class='grid' x1='85' y1='209.6' x2='725' y2='209.6'/>
-<text x='77' y='213.6' text-anchor='end' font-size='11'>24.7</text>
+<text x='77' y='213.6' text-anchor='end' font-size='11'>24.5</text>
 <line class='grid' x1='85' y1='130.8' x2='725' y2='130.8'/>
-<text x='77' y='134.8' text-anchor='end' font-size='11'>33.0</text>
+<text x='77' y='134.8' text-anchor='end' font-size='11'>32.7</text>
 <line class='grid' x1='85' y1='52.0' x2='725' y2='52.0'/>
-<text x='77' y='56.0' text-anchor='end' font-size='11'>41.2</text>
+<text x='77' y='56.0' text-anchor='end' font-size='11'>40.9</text>
 <line class='axis' x1='85' y1='52' x2='85' y2='446'/>
 <line class='axis' x1='85' y1='446' x2='725' y2='446'/>
 <text x='85.0' y='466' text-anchor='middle' font-size='10'>1K</text>
@@ -26,29 +26,29 @@
 <text x='608.3' y='466' text-anchor='middle' font-size='10'>998K</text>
 <text x='666.6' y='466' text-anchor='middle' font-size='10'>1M</text>
 <text x='725.0' y='466' text-anchor='middle' font-size='10'>3M</text>
-<polyline fill='none' stroke='#1769aa' stroke-width='3' points='85.0,172.7 220.6,87.8 278.9,117.8 337.2,143.7 414.6,150.5 472.9,166.2 531.1,177.4 608.3,290.1 666.6,121.9 725.0,225.6'/>
-<circle cx='85.0' cy='172.7' r='4' fill='#1769aa'/>
+<polyline fill='none' stroke='#1769aa' stroke-width='3' points='85.0,174.9 220.6,87.8 278.9,92.2 337.2,138.2 414.6,136.4 472.9,142.2 531.1,163.6 608.3,283.3 666.6,116.6 725.0,218.3'/>
+<circle cx='85.0' cy='174.9' r='4' fill='#1769aa'/>
 <circle cx='220.6' cy='87.8' r='4' fill='#1769aa'/>
-<circle cx='278.9' cy='117.8' r='4' fill='#1769aa'/>
-<circle cx='337.2' cy='143.7' r='4' fill='#1769aa'/>
-<circle cx='414.6' cy='150.5' r='4' fill='#1769aa'/>
-<circle cx='472.9' cy='166.2' r='4' fill='#1769aa'/>
-<circle cx='531.1' cy='177.4' r='4' fill='#1769aa'/>
-<circle cx='608.3' cy='290.1' r='4' fill='#1769aa'/>
-<circle cx='666.6' cy='121.9' r='4' fill='#1769aa'/>
-<circle cx='725.0' cy='225.6' r='4' fill='#1769aa'/>
+<circle cx='278.9' cy='92.2' r='4' fill='#1769aa'/>
+<circle cx='337.2' cy='138.2' r='4' fill='#1769aa'/>
+<circle cx='414.6' cy='136.4' r='4' fill='#1769aa'/>
+<circle cx='472.9' cy='142.2' r='4' fill='#1769aa'/>
+<circle cx='531.1' cy='163.6' r='4' fill='#1769aa'/>
+<circle cx='608.3' cy='283.3' r='4' fill='#1769aa'/>
+<circle cx='666.6' cy='116.6' r='4' fill='#1769aa'/>
+<circle cx='725.0' cy='218.3' r='4' fill='#1769aa'/>
 <line x1='739' y1='60' x2='765' y2='60' stroke='#1769aa' stroke-width='3'/><text x='771' y='64' font-size='12'>babobook</text>
-<polyline fill='none' stroke='#d95f02' stroke-width='3' points='85.0,227.7 220.6,307.8 278.9,297.9 337.2,335.1 414.6,268.6 472.9,278.7 531.1,295.1 608.3,376.6 666.6,312.6 725.0,347.3'/>
-<circle cx='85.0' cy='227.7' r='4' fill='#d95f02'/>
-<circle cx='220.6' cy='307.8' r='4' fill='#d95f02'/>
-<circle cx='278.9' cy='297.9' r='4' fill='#d95f02'/>
-<circle cx='337.2' cy='335.1' r='4' fill='#d95f02'/>
-<circle cx='414.6' cy='268.6' r='4' fill='#d95f02'/>
-<circle cx='472.9' cy='278.7' r='4' fill='#d95f02'/>
-<circle cx='531.1' cy='295.1' r='4' fill='#d95f02'/>
-<circle cx='608.3' cy='376.6' r='4' fill='#d95f02'/>
-<circle cx='666.6' cy='312.6' r='4' fill='#d95f02'/>
-<circle cx='725.0' cy='347.3' r='4' fill='#d95f02'/>
+<polyline fill='none' stroke='#d95f02' stroke-width='3' points='85.0,209.6 220.6,306.2 278.9,298.4 337.2,330.5 414.6,259.4 472.9,271.0 531.1,287.3 608.3,375.1 666.6,308.8 725.0,344.1'/>
+<circle cx='85.0' cy='209.6' r='4' fill='#d95f02'/>
+<circle cx='220.6' cy='306.2' r='4' fill='#d95f02'/>
+<circle cx='278.9' cy='298.4' r='4' fill='#d95f02'/>
+<circle cx='337.2' cy='330.5' r='4' fill='#d95f02'/>
+<circle cx='414.6' cy='259.4' r='4' fill='#d95f02'/>
+<circle cx='472.9' cy='271.0' r='4' fill='#d95f02'/>
+<circle cx='531.1' cy='287.3' r='4' fill='#d95f02'/>
+<circle cx='608.3' cy='375.1' r='4' fill='#d95f02'/>
+<circle cx='666.6' cy='308.8' r='4' fill='#d95f02'/>
+<circle cx='725.0' cy='344.1' r='4' fill='#d95f02'/>
 <line x1='739' y1='80' x2='765' y2='80' stroke='#d95f02' stroke-width='3'/><text x='771' y='84' font-size='12'>liquibook</text>
 <text transform='translate(20 249) rotate(-90)' text-anchor='middle' font-size='13'>M msgs/s (peak)</text>
 <text x='405' y='508' text-anchor='middle' font-size='13'>Messages replayed (log)</text>
