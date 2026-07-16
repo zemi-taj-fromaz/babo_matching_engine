@@ -1,0 +1,32 @@
+
+[1m[36m==============================================================[0m
+[1m[36m  liquibook   |   depth ON[0m
+[1m[36m  core 5   |   3 reps   |   1 warmup, then measured[0m
+[1m[36m==============================================================[0m
+  [2mexperiment: cancel throughput vs resting-book size[0m
+  - pinned to core 5
+  [33m- could not raise priority (run as admin/root for clean numbers)[0m
+
+  [1msize 1,000[0m   [2mdepth ~15/lvl (64 lvls)[0m   [1;32mcancel 5.83 M/s[0m   171.4 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=1000 levels=64 depth=15 cancels=1000 seconds=0.000171 mps=5.8342 ns_per_cancel=171.403
+
+  [1msize 2,000[0m   [2mdepth ~31/lvl (64 lvls)[0m   [1;32mcancel 4.53 M/s[0m   220.5 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=2000 levels=64 depth=31 cancels=2000 seconds=0.000441 mps=4.5347 ns_per_cancel=220.521
+
+  [1msize 5,000[0m   [2mdepth ~78/lvl (64 lvls)[0m   [1;32mcancel 2.65 M/s[0m   377.7 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=5000 levels=64 depth=78 cancels=5000 seconds=0.001888 mps=2.6479 ns_per_cancel=377.658
+
+  [1msize 10,000[0m   [2mdepth ~156/lvl (64 lvls)[0m   [1;32mcancel 1.46 M/s[0m   683.0 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=10000 levels=64 depth=156 cancels=10000 seconds=0.006830 mps=1.4642 ns_per_cancel=682.971
+
+  [1msize 20,000[0m   [2mdepth ~312/lvl (64 lvls)[0m   [1;32mcancel 0.77 M/s[0m   1305.2 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=20000 levels=64 depth=312 cancels=20000 seconds=0.026105 mps=0.7661 ns_per_cancel=1305.243
+
+  [1msize 50,000[0m   [2mdepth ~781/lvl (64 lvls)[0m   [1;32mcancel 0.29 M/s[0m   3422.0 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=50000 levels=64 depth=781 cancels=50000 seconds=0.171100 mps=0.2922 ns_per_cancel=3422.003
+
+  [1msize 100,000[0m   [2mdepth ~1,562/lvl (64 lvls)[0m   [1;32mcancel 0.13 M/s[0m   7867.3 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=100000 levels=64 depth=1562 cancels=100000 seconds=0.786730 mps=0.1271 ns_per_cancel=7867.299
+
+  [1msize 200,000[0m   [2mdepth ~3,125/lvl (64 lvls)[0m   [1;32mcancel 0.05 M/s[0m   21871.9 ns/cancel   [2m(best of 3)[0m
+SCALEROW engine=liquibook size=200000 levels=64 depth=3125 cancels=200000 seconds=4.374380 mps=0.0457 ns_per_cancel=21871.898

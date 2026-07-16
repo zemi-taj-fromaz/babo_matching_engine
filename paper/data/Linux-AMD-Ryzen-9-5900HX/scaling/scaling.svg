@@ -1,0 +1,47 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='1000' height='580' viewBox='0 0 1000 580'>
+<rect width='100%' height='100%' fill='white'/>
+<style>text{font-family:Arial,sans-serif;fill:#222}.grid{stroke:#e5e5e5}.axis{stroke:#333}.a{fill:none;stroke:#1769aa;stroke-width:3}.b{fill:none;stroke:#d95f02;stroke-width:3}</style>
+<text x='500' y='28' text-anchor='middle' font-size='18' font-weight='bold'>Cancel latency vs resting-book size (64 price levels)</text>
+<line class='grid' x1='90' y1='590.2' x2='810' y2='590.2'/>
+<text x='82' y='594.2' text-anchor='end' font-size='11'>10</text>
+<line class='grid' x1='90' y1='430.0' x2='810' y2='430.0'/>
+<text x='82' y='434.0' text-anchor='end' font-size='11'>100</text>
+<line class='grid' x1='90' y1='269.7' x2='810' y2='269.7'/>
+<text x='82' y='273.7' text-anchor='end' font-size='11'>1,000</text>
+<line class='grid' x1='90' y1='109.5' x2='810' y2='109.5'/>
+<text x='82' y='113.5' text-anchor='end' font-size='11'>10,000</text>
+<line class='grid' x1='90' y1='-50.8' x2='810' y2='-50.8'/>
+<text x='82' y='-46.8' text-anchor='end' font-size='11'>100,000</text>
+<line class='axis' x1='90' y1='55' x2='90' y2='500'/>
+<line class='axis' x1='90' y1='500' x2='810' y2='500'/>
+<text x='90.0' y='522' text-anchor='middle' font-size='11'>1K</text>
+<text x='184.2' y='522' text-anchor='middle' font-size='11'>2K</text>
+<text x='308.7' y='522' text-anchor='middle' font-size='11'>5K</text>
+<text x='402.9' y='522' text-anchor='middle' font-size='11'>10K</text>
+<text x='497.1' y='522' text-anchor='middle' font-size='11'>20K</text>
+<text x='621.6' y='522' text-anchor='middle' font-size='11'>50K</text>
+<text x='715.8' y='522' text-anchor='middle' font-size='11'>100K</text>
+<text x='810.0' y='522' text-anchor='middle' font-size='11'>200K</text>
+<polyline class='b' points='90.0,392.5 184.2,374.9 308.7,337.5 402.9,296.2 497.1,251.2 621.6,184.1 715.8,126.2 810.0,55.0'/>
+<polyline class='a' points='90.0,500.0 184.2,492.4 308.7,480.7 402.9,467.8 497.1,459.2 621.6,448.4 715.8,435.4 810.0,401.6'/>
+<circle cx='90.0' cy='500.0' r='4.5' fill='#1769aa'/>
+<circle cx='90.0' cy='392.5' r='4.5' fill='#d95f02'/>
+<circle cx='184.2' cy='492.4' r='4.5' fill='#1769aa'/>
+<circle cx='184.2' cy='374.9' r='4.5' fill='#d95f02'/>
+<circle cx='308.7' cy='480.7' r='4.5' fill='#1769aa'/>
+<circle cx='308.7' cy='337.5' r='4.5' fill='#d95f02'/>
+<circle cx='402.9' cy='467.8' r='4.5' fill='#1769aa'/>
+<circle cx='402.9' cy='296.2' r='4.5' fill='#d95f02'/>
+<circle cx='497.1' cy='459.2' r='4.5' fill='#1769aa'/>
+<circle cx='497.1' cy='251.2' r='4.5' fill='#d95f02'/>
+<circle cx='621.6' cy='448.4' r='4.5' fill='#1769aa'/>
+<circle cx='621.6' cy='184.1' r='4.5' fill='#d95f02'/>
+<circle cx='715.8' cy='435.4' r='4.5' fill='#1769aa'/>
+<circle cx='715.8' cy='126.2' r='4.5' fill='#d95f02'/>
+<circle cx='810.0' cy='401.6' r='4.5' fill='#1769aa'/>
+<circle cx='810.0' cy='55.0' r='4.5' fill='#d95f02'/>
+<text transform='translate(22 277) rotate(-90)' text-anchor='middle' font-size='13'>ns per cancel (log)</text>
+<text x='450' y='566' text-anchor='middle' font-size='13'>Resting orders (log)</text>
+<line x1='830' y1='70' x2='856' y2='70' stroke='#1769aa' stroke-width='3'/><text x='862' y='74' font-size='12'>babobook O(1)</text>
+<line x1='830' y1='92' x2='856' y2='92' stroke='#d95f02' stroke-width='3'/><text x='862' y='96' font-size='12'>liquibook O(depth)</text>
+</svg>

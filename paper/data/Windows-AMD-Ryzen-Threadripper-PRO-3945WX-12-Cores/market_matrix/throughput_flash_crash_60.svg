@@ -1,0 +1,55 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='900' height='520' viewBox='0 0 900 520'>
+<rect width='100%' height='100%' fill='white'/>
+<style>text{font-family:Arial,sans-serif;fill:#222}.grid{stroke:#e8e8e8}.axis{stroke:#333}</style>
+<text x='450' y='28' text-anchor='middle' font-size='17' font-weight='bold'>Flash-crash-60 — throughput vs message count</text>
+<line class='grid' x1='85' y1='446.0' x2='725' y2='446.0'/>
+<text x='77' y='450.0' text-anchor='end' font-size='11'>0.0</text>
+<line class='grid' x1='85' y1='367.2' x2='725' y2='367.2'/>
+<text x='77' y='371.2' text-anchor='end' font-size='11'>2.8</text>
+<line class='grid' x1='85' y1='288.4' x2='725' y2='288.4'/>
+<text x='77' y='292.4' text-anchor='end' font-size='11'>5.6</text>
+<line class='grid' x1='85' y1='209.6' x2='725' y2='209.6'/>
+<text x='77' y='213.6' text-anchor='end' font-size='11'>8.5</text>
+<line class='grid' x1='85' y1='130.8' x2='725' y2='130.8'/>
+<text x='77' y='134.8' text-anchor='end' font-size='11'>11.3</text>
+<line class='grid' x1='85' y1='52.0' x2='725' y2='52.0'/>
+<text x='77' y='56.0' text-anchor='end' font-size='11'>14.1</text>
+<line class='axis' x1='85' y1='52' x2='85' y2='446'/>
+<line class='axis' x1='85' y1='446' x2='725' y2='446'/>
+<text x='85.0' y='466' text-anchor='middle' font-size='10'>1K</text>
+<text x='220.6' y='466' text-anchor='middle' font-size='10'>9K</text>
+<text x='278.9' y='466' text-anchor='middle' font-size='10'>19K</text>
+<text x='337.2' y='466' text-anchor='middle' font-size='10'>39K</text>
+<text x='414.6' y='466' text-anchor='middle' font-size='10'>99K</text>
+<text x='472.9' y='466' text-anchor='middle' font-size='10'>199K</text>
+<text x='531.1' y='466' text-anchor='middle' font-size='10'>399K</text>
+<text x='608.3' y='466' text-anchor='middle' font-size='10'>998K</text>
+<text x='666.6' y='466' text-anchor='middle' font-size='10'>1M</text>
+<text x='725.0' y='466' text-anchor='middle' font-size='10'>3M</text>
+<polyline fill='none' stroke='#1769aa' stroke-width='3' points='85.0,177.0 220.6,131.5 278.9,95.3 337.2,132.2 414.6,165.1 472.9,139.8 531.1,155.3 608.3,242.8 666.6,87.8 725.0,159.9'/>
+<circle cx='85.0' cy='177.0' r='4' fill='#1769aa'/>
+<circle cx='220.6' cy='131.5' r='4' fill='#1769aa'/>
+<circle cx='278.9' cy='95.3' r='4' fill='#1769aa'/>
+<circle cx='337.2' cy='132.2' r='4' fill='#1769aa'/>
+<circle cx='414.6' cy='165.1' r='4' fill='#1769aa'/>
+<circle cx='472.9' cy='139.8' r='4' fill='#1769aa'/>
+<circle cx='531.1' cy='155.3' r='4' fill='#1769aa'/>
+<circle cx='608.3' cy='242.8' r='4' fill='#1769aa'/>
+<circle cx='666.6' cy='87.8' r='4' fill='#1769aa'/>
+<circle cx='725.0' cy='159.9' r='4' fill='#1769aa'/>
+<line x1='739' y1='60' x2='765' y2='60' stroke='#1769aa' stroke-width='3'/><text x='771' y='64' font-size='12'>babobook</text>
+<polyline fill='none' stroke='#d95f02' stroke-width='3' points='85.0,257.3 220.6,317.1 278.9,307.9 337.2,323.1 414.6,258.0 472.9,285.3 531.1,301.9 608.3,368.6 666.6,322.6 725.0,350.1'/>
+<circle cx='85.0' cy='257.3' r='4' fill='#d95f02'/>
+<circle cx='220.6' cy='317.1' r='4' fill='#d95f02'/>
+<circle cx='278.9' cy='307.9' r='4' fill='#d95f02'/>
+<circle cx='337.2' cy='323.1' r='4' fill='#d95f02'/>
+<circle cx='414.6' cy='258.0' r='4' fill='#d95f02'/>
+<circle cx='472.9' cy='285.3' r='4' fill='#d95f02'/>
+<circle cx='531.1' cy='301.9' r='4' fill='#d95f02'/>
+<circle cx='608.3' cy='368.6' r='4' fill='#d95f02'/>
+<circle cx='666.6' cy='322.6' r='4' fill='#d95f02'/>
+<circle cx='725.0' cy='350.1' r='4' fill='#d95f02'/>
+<line x1='739' y1='80' x2='765' y2='80' stroke='#d95f02' stroke-width='3'/><text x='771' y='84' font-size='12'>liquibook</text>
+<text transform='translate(20 249) rotate(-90)' text-anchor='middle' font-size='13'>M msgs/s (peak)</text>
+<text x='405' y='508' text-anchor='middle' font-size='13'>Messages replayed (log)</text>
+</svg>

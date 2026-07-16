@@ -1,0 +1,155 @@
+{
+  "metadata": {
+    "created_utc": "2026-07-14T13:42:05.611010+00:00",
+    "generated_by": "scripts/run_scaling.py",
+    "runner_sha256": "8915ee0f228cb58a5f2c383bf1f775727cbccd135037b61b779a7c4e7f47e67f",
+    "label": "Linux-AMD Ryzen 9 5900HX",
+    "levels": 64,
+    "reps": 3,
+    "sizes": [
+      1000,
+      2000,
+      5000,
+      10000,
+      20000,
+      50000,
+      100000,
+      200000
+    ],
+    "svg_name": "scaling.svg",
+    "machine": {
+      "os": "Linux-6.17.0-14-generic-x86_64-with-glibc2.39",
+      "system": "Linux",
+      "architecture": "x86_64",
+      "cpu": "AMD Ryzen 9 5900HX with Radeon Graphics",
+      "logical_cpus": 16,
+      "memory_bytes": 32959283200,
+      "memory_gib": 30.7,
+      "python": "3.13.4"
+    },
+    "compiler": {
+      "cmake_generator": "Unix Makefiles",
+      "cmake_build_type": "Release",
+      "cxx_compiler": "/usr/bin/c++",
+      "cxx_compiler_id": "GNU",
+      "cxx_compiler_version": "13.3.0",
+      "cxx_compiler_version_output": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+      "cxx_flags": "",
+      "cxx_flags_release": "-O3 -DNDEBUG",
+      "cmake_cache_sha256": "de7b87e842028b31fd549e0fc2802c2f82ca2f12d959aeaf70b903f1dafe12b3",
+      "pin_sweep_enabled": "OFF"
+    },
+    "git": {
+      "commit": "486d2fa8942fa47c4ce827c7d3afb754aa8b2d1a",
+      "branch": "main",
+      "dirty": true,
+      "status_available": true
+    },
+    "binaries": {
+      "babo_scaling": {
+        "sha256": "79d99fddeb73bc7779be471d8c52a96f292ad2a9666d77ed58e784bd12103a93"
+      },
+      "liqui_scaling": {
+        "sha256": "9bbbdf09ef4ecb64a8f036917be193fb7d643846be75899678609d3e5f261c23"
+      }
+    }
+  },
+  "results": [
+    {
+      "size": 1000,
+      "levels": 64,
+      "depth": 15,
+      "babo_ns": 36.549,
+      "liqui_ns": 171.403,
+      "babo_mps": 27.3605,
+      "liqui_mps": 5.8342,
+      "babo_seconds": 3.7e-05,
+      "liqui_seconds": 0.000171,
+      "speedup": 4.689676872144244
+    },
+    {
+      "size": 2000,
+      "levels": 64,
+      "depth": 31,
+      "babo_ns": 40.747,
+      "liqui_ns": 220.521,
+      "babo_mps": 24.5417,
+      "liqui_mps": 4.5347,
+      "babo_seconds": 8.1e-05,
+      "liqui_seconds": 0.000441,
+      "speedup": 5.411956708469335
+    },
+    {
+      "size": 5000,
+      "levels": 64,
+      "depth": 78,
+      "babo_ns": 48.261,
+      "liqui_ns": 377.658,
+      "babo_mps": 20.7207,
+      "liqui_mps": 2.6479,
+      "babo_seconds": 0.000241,
+      "liqui_seconds": 0.001888,
+      "speedup": 7.825324796419469
+    },
+    {
+      "size": 10000,
+      "levels": 64,
+      "depth": 156,
+      "babo_ns": 58.047,
+      "liqui_ns": 682.971,
+      "babo_mps": 17.2273,
+      "liqui_mps": 1.4642,
+      "babo_seconds": 0.00058,
+      "liqui_seconds": 0.00683,
+      "speedup": 11.765827691353559
+    },
+    {
+      "size": 20000,
+      "levels": 64,
+      "depth": 312,
+      "babo_ns": 65.734,
+      "liqui_ns": 1305.243,
+      "babo_mps": 15.2129,
+      "liqui_mps": 0.7661,
+      "babo_seconds": 0.001315,
+      "liqui_seconds": 0.026105,
+      "speedup": 19.85643654729668
+    },
+    {
+      "size": 50000,
+      "levels": 64,
+      "depth": 781,
+      "babo_ns": 76.737,
+      "liqui_ns": 3422.003,
+      "babo_mps": 13.0315,
+      "liqui_mps": 0.2922,
+      "babo_seconds": 0.003837,
+      "liqui_seconds": 0.1711,
+      "speedup": 44.59391167233539
+    },
+    {
+      "size": 100000,
+      "levels": 64,
+      "depth": 1562,
+      "babo_ns": 92.466,
+      "liqui_ns": 7867.299,
+      "babo_mps": 10.8148,
+      "liqui_mps": 0.1271,
+      "babo_seconds": 0.009247,
+      "liqui_seconds": 0.78673,
+      "speedup": 85.08315488936475
+    },
+    {
+      "size": 200000,
+      "levels": 64,
+      "depth": 3125,
+      "babo_ns": 150.349,
+      "liqui_ns": 21871.898,
+      "babo_mps": 6.6512,
+      "liqui_mps": 0.0457,
+      "babo_seconds": 0.03007,
+      "liqui_seconds": 4.37438,
+      "speedup": 145.47418339995613
+    }
+  ]
+}
