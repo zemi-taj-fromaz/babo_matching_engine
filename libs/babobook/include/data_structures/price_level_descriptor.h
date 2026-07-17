@@ -41,8 +41,9 @@ struct price_level_descriptor
     [[nodiscard]] bool empty() const noexcept { return _head.pin_loc == nullptr; }
 };
 
-// Process-wide pool for price_level_descriptor objects (Meyers singleton; single-threaded
-// engine). Mirrors pin_node_pool(). allocate() value-initialises the descriptor.
+// Process-wide unsynchronized pool for price_level_descriptor objects. It has
+// the same one-matching-thread and non-static-book lifetime contract as
+// pin_node_pool(). allocate() value-initialises the descriptor.
 inline memory::AllocatorPool<price_level_descriptor>& price_level_descriptor_pool()
 {
     static memory::AllocatorPool<price_level_descriptor> pool;

@@ -146,7 +146,9 @@ private:
 
 using pin_node_t = pin_node<kNodeCapacity>;
 
-// Process-wide pool for pin_node_t objects (Meyers singleton; single-threaded engine).
+// Process-wide unsynchronized pool for pin_node_t objects. All books in this
+// process/module must be constructed, operated, and destroyed on one matching
+// thread and must not have static-storage duration.
 inline memory::AllocatorPool<pin_node_t, 128>& pin_node_pool()
 {
 	static memory::AllocatorPool<pin_node_t, 128> pool;

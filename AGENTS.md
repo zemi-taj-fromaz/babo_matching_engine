@@ -127,6 +127,10 @@ Three layers, decoupled by the C ABI:
 - `memory/memory_pool.h`, `simple/simple_order.h`, `book/depth.h` — arena, order
   value type, and a passive top-of-book depth **snapshot** (filled by the walk in
   `matching_book::depth()`; no per-op maintenance).
+- **Threading/lifetime contract:** all books in one process share two unsynchronized
+  process-wide pools. Construct, operate, and destroy them on one matching thread;
+  multiple books on different threads are unsupported. Books must have scoped,
+  non-static lifetime and be destroyed before process/module shutdown.
 
 ### Key contract invariants (from `matching_engine_api.h`)
 

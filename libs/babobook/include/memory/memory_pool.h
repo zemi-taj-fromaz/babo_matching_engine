@@ -25,6 +25,8 @@ union PGMemChunk
 template <typename T, size_t N = 1024>
 class AllocatorPool
 {
+    static_assert(N >= 2, "AllocatorPool N == 1 flexible-block mode is not implemented");
+
 public:
 
     ~AllocatorPool()

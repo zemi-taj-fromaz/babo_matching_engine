@@ -332,6 +332,21 @@ the state audit to `PASS`.
   tree on demand (see `depth()`), not maintained eagerly — so publishing depth
   costs the hot path nothing.
 
+### Threading and pool lifetime
+
+`matching_book` is a single-threaded matching core. Its PIN-node and price-level
+pools are process-wide, allocation-reusing singletons and are intentionally not
+synchronized. All book operations and book construction/destruction in one
+process must therefore be serialized on one matching thread. Multiple book
+instances are supported when that same thread owns them; concurrently operating
+books on different threads are not.
+
+Books should have ordinary scoped lifetime and be destroyed before process/module
+shutdown. A `narb_tree` destructor returns its live nodes and level descriptors to
+the shared pools, while the pools retain their allocated blocks for low-latency
+reuse until process exit. Do not create a `matching_book` with static-storage
+duration.
+
 ---
 
 ## TL;DR
