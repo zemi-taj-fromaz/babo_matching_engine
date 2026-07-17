@@ -312,7 +312,7 @@ the state audit to `PASS`.
 
 | Path | What |
 |---|---|
-| `libs/babobook/` | the **babo** engine — `matching_book<SIZE, TRADE_CAP>`, header-only + one `.cpp` |
+| `libs/babobook/` | the **babo** engine — `matching_book<SIZE>`, header-only + one `.cpp` |
 | `libs/liquibook/` | the vendored reference engine (frozen) |
 | `benchmark/` | the plugin **harness** + the C-ABI contract (`api/matching_engine_api.h`) |
 | `benchmark/adapters/` | each order book wrapped behind the ABI as a canonical shared lib |

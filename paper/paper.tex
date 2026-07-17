@@ -533,12 +533,12 @@ slots rather than in separately allocated heap objects.
 
 \subsection{Matching and lifecycle behavior}
 
-\texttt{matching\_book<SIZE,TRADE\_CAP>} synchronously handles each command.
+\texttt{matching\_book<SIZE>} synchronously handles each command.
 The new-order path crosses the best opposite prices, emits one trade per fill,
 removes completed makers through the same direct index, and rests an eligible
 residual.  IOC residuals are cancelled.  AON orders first check executable
 quantity, while stop orders remain parked until the market price triggers them.
-A fixed-capacity inline trade ring records fills without allocating.
+Canonical fill events are emitted synchronously through the id-based order listener.
 
 The native book supports nuanced replace behavior, but the benchmark adapter
 deliberately implements every modify as cancel plus reinsert.  This creates one
@@ -734,7 +734,7 @@ three complementary checks.
 First, GoogleTest exercises babobook directly: bid and ask insertion,
 partial and multi-level fills, maker-price execution, cancellation, rejection,
 replace behavior, IOC/FOK, AON, stops, market price, depth ordering and
-aggregation, and the trade ring.  The vendored upstream \textit{Liquibook} tests remain a
+aggregation, and the canonical fill-event stream.  The vendored upstream \textit{Liquibook} tests remain a
 frozen baseline.
 
 Second, the harness hashes the entire 64-byte report stream.  References are

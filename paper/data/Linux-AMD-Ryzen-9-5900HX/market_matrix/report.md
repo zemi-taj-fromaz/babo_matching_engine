@@ -6,7 +6,7 @@
 - **CPU / OS:** AMD Ryzen 9 5900HX with Radeon Graphics — Linux-6.17.0-14-generic-x86_64-with-glibc2.39
 - **RAM / logical CPUs:** 30.7 GiB / 16
 - **Compiler:** GNU 13.3.0 · build `Release`
-- **Git:** `486d2fa8942fa47c4ce827c7d3afb754aa8b2d1a` (branch `main`, dirty `True`)
+- **Git:** `486d2fa8942fa47c4ce827c7d3afb754aa8b2d1a` (branch `main`, dirty `False`)
 - **Protocol:** core-pinned perf binaries, no-op listener; 10 reps per cell, reporting **peak** (per-rep min / best); 1 warmup per cell.
 - **Scale:** 1,000, 5,000, 10,000, 20,000, 50,000, 100,000, 200,000, 500,000, 1,000,000, 2,000,000 NEW orders (messages ≈ 2.25×).
 

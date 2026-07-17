@@ -108,11 +108,11 @@ Three layers, decoupled by the C ABI:
 
 ### babo engine internals (`libs/babobook/include/`)
 
-- `book/matching_book.h` — the matching core: `matching_book<SIZE, TRADE_CAP>`. The
+- `book/matching_book.h` — the matching core: `matching_book<SIZE>`. The
   book **owns nothing**; the `narb_tree`s own all resting/parked orders by value and
   the application interacts purely by order id. Handles new/cancel/replace/market-price,
   IOC, AON, and stop orders (parked in separate `narb_tree`s keyed by stop price).
-  Emits an inline lock-free trade ring plus the order/trade/book-change listeners.
+  Emits canonical order-domain events through one id-based `OrderListener`.
   Depth is **pull-based**: `depth()` (compiled out under `BABO_NO_DEPTH`) derives the
   top-SIZE aggregate on demand by walking the tree's best-first level threads and
   reading each `price_level_descriptor`'s `_quantity`/`_count` — nothing on the hot

@@ -6,8 +6,7 @@
 // VALUE, so the caller's SimpleOrder is stale the moment it's added. We therefore
 // observe results through three channels instead:
 //   1. RecordingListener  -- accept/reject/fill/cancel/replace events, keyed by id
-//   2. the trade ring      -- {maker, taker, qty, price} for every execution
-//   3. the resting copy     -- book.bids()/asks().find_order(id) for post-fill state
+//   2. the resting copy     -- book.bids()/asks().find_order(id) for post-fill state
 #pragma once
 
 #include "depth_check.h"
@@ -83,13 +82,6 @@ protected:
   void SetUp() override {
     SimpleOrder::reset_id_generator();   // ids restart at 1 each test
     book.set_order_listener(&listener);
-  }
-
-  // Drain the inline trade ring into a vector (oldest-first).
-  std::vector<babo::book::trade> drain_trades() {
-    std::vector<babo::book::trade> out;
-    while (book.trades_available()) out.push_back(book.read_trade());
-    return out;
   }
 
   // Is `id` still resting somewhere in the visible book?

@@ -47,13 +47,6 @@ TEST_F(Fixture, AddCompleteBid)
   EXPECT_FALSE(resting(bid1_id));   // taker fully filled
   EXPECT_FALSE(resting(ask0_id));   // maker fully filled
 
-  auto trades = drain_trades();
-  ASSERT_EQ(trades.size(), 1u);
-  EXPECT_EQ(trades[0].maker_id, ask0_id);
-  EXPECT_EQ(trades[0].taker_id, bid1_id);
-  EXPECT_EQ(trades[0].qty,   100u);
-  EXPECT_EQ(trades[0].price, 1251u);
-
   DepthCheck<Book> dc(book.depth());
   EXPECT_TRUE(dc.verify_bid(1250, 1, 100));
   EXPECT_TRUE(dc.verify_ask(1252, 1, 100));

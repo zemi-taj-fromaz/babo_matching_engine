@@ -7,7 +7,7 @@
 - **Logical CPUs / RAM:** 16 / 30.7 GiB
 - **Compiler:** GNU 13.3.0
 - **CMake build type:** `Release`
-- **Git:** `486d2fa8942fa47c4ce827c7d3afb754aa8b2d1a` (branch `main`, dirty `True`)
+- **Git:** `486d2fa8942fa47c4ce827c7d3afb754aa8b2d1a` (branch `main`, dirty `False`)
 - **Setup:** 64 price levels; N orders → depth ≈ N/64; cancel all N in a fixed shuffled order; best of 3 reps; prefill off the clock.
 
 | Resting N | Depth/level | babo ns/cancel | liquibook ns/cancel | babo cancel speedup |

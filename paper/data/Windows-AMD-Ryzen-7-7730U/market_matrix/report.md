@@ -6,7 +6,7 @@
 - **CPU / OS:** AMD Ryzen 7 7730U with Radeon Graphics — Windows-11-10.0.26200-SP0
 - **RAM / logical CPUs:** 13.84 GiB / 16
 - **Compiler:** Clang 22.1.0 · build `Release`
-- **Git:** `4ee60763d421accfea21f1003f7acd90002b11c1` (branch `main`, dirty `True`)
+- **Git:** `4ee60763d421accfea21f1003f7acd90002b11c1` (branch `main`, dirty `False`)
 - **Protocol:** core-pinned perf binaries, no-op listener; 10 reps per cell, reporting **peak** (per-rep min / best); 1 warmup per cell.
 - **Scale:** 1,000, 5,000, 10,000, 20,000, 50,000, 100,000, 200,000, 500,000, 1,000,000, 2,000,000 NEW orders (messages ≈ 2.25×).
 

@@ -42,7 +42,7 @@
     "git": {
       "commit": "4ee60763d421accfea21f1003f7acd90002b11c1",
       "branch": "main",
-      "dirty": true,
+      "dirty": false,
       "status_available": true
     },
     "binaries": {

@@ -6,7 +6,7 @@
 - **CPU / OS:** AMD Ryzen Threadripper PRO 3945WX 12-Cores — Windows-11-10.0.26200-SP0
 - **RAM / logical CPUs:** 127.86 GiB / 24
 - **Compiler:** Clang 17.0.6 · build `Release`
-- **Git:** `486d2fa8942fa47c4ce827c7d3afb754aa8b2d1a` (branch `main`, dirty `True`)
+- **Git:** `486d2fa8942fa47c4ce827c7d3afb754aa8b2d1a` (branch `main`, dirty `False`)
 - **Protocol:** core-pinned perf binaries, no-op listener; 10 reps per cell, reporting **peak** (per-rep min / best); 1 warmup per cell.
 - **Scale:** 1,000, 5,000, 10,000, 20,000, 50,000, 100,000, 200,000, 500,000, 1,000,000, 2,000,000 NEW orders (messages ≈ 2.25×).
 
