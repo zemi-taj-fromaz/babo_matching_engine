@@ -112,8 +112,9 @@ Three layers, decoupled by the C ABI:
 ### babo engine internals (`libs/babobook/include/`)
 
 - `book/matching_book.h` — the matching core: `matching_book<SIZE>`. The
-  book **owns nothing**; the `narb_tree`s own all resting/parked orders by value and
-  the application interacts purely by order id. Handles new/cancel/replace/market-price,
+  book owns four `narb_tree`s; each tree owns its resting/parked orders by value,
+  returns its shared-pool allocations on destruction, and the application interacts
+  purely by order id. Handles new/cancel/replace/market-price,
   IOC, AON, and stop orders (parked in separate `narb_tree`s keyed by stop price).
   Emits canonical order-domain events through one id-based `OrderListener`.
   Depth is **pull-based**: `depth()` (compiled out under `BABO_NO_DEPTH`) derives the

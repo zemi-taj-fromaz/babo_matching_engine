@@ -29,6 +29,44 @@ class narb_tree
 public:
     using value_type = std::pair<price_level_descriptor*, simple::SimpleOrder>;
 
+    narb_tree() = default;
+    ~narb_tree() noexcept { clear(); }
+
+    narb_tree(const narb_tree&) = delete;
+    narb_tree& operator=(const narb_tree&) = delete;
+    narb_tree(narb_tree&&) = delete;
+    narb_tree& operator=(narb_tree&&) = delete;
+
+    // Return only this tree's live allocations to the process-wide pools.
+    // The pools are shared by every side/tree/book, so destroyAll() must never
+    // be called here.
+    void clear() noexcept
+    {
+        pin_node_t* node = _chain_head;
+        while (node)
+        {
+            pin_node_t* next = node->next_node();
+            pin_node_pool().release(node);
+            node = next;
+        }
+
+        price_level_descriptor* level = _best;
+        while (level)
+        {
+            price_level_descriptor* next;
+            if constexpr (type == order_type::BID) next = level->pred;
+            else                                   next = level->succ;
+            price_level_descriptor_pool().release(level);
+            level = next;
+        }
+
+        _order_index.clear();
+        _best = nullptr;
+        _root = nullptr;
+        _chain_head = nullptr;
+        _chain_tail = nullptr;
+    }
+
     price_level_descriptor* get_best();
 
     search_result find_neighbors(std::uint64_t price);

@@ -1,6 +1,7 @@
 //
-// Reworked matching core: the book owns nothing; the narb_trees (global PIN chains)
-// own all resting/parked orders by value. The application interacts purely by order id.
+// Reworked matching core: the book owns four narb_trees; each tree owns its
+// resting/parked orders by value and returns its shared-pool allocations on destruction.
+// The application interacts purely by order id.
 // Composes a pull-based book::Depth<SIZE> snapshot and emits canonical order-domain
 // events through one id-based OrderListener.
 //

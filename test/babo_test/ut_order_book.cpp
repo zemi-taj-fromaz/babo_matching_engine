@@ -6,10 +6,57 @@
 #include "unit/babo_test_utils.h"
 
 #include <gtest/gtest.h>
+#include <type_traits>
 
 namespace babo::test {
 
 using Fixture = BookFixture;   // matching_book<5> + RecordingListener, ids reset per test
+
+TEST(NarbTreeLifetime, ReturnsLiveBookAllocationsToSharedPools)
+{
+  using Book = babo::book::matching_book<>;
+
+  static_assert(!std::is_copy_constructible_v<Book>);
+  static_assert(!std::is_copy_assignable_v<Book>);
+  static_assert(!std::is_move_constructible_v<Book>);
+  static_assert(!std::is_move_assignable_v<Book>);
+
+  const auto pin_before = pin_node_pool().getNbElements();
+  const auto level_before = price_level_descriptor_pool().getNbElements();
+
+  {
+    Book survivor;
+    SimpleOrder survivor_bid(true, 80, 10);
+    const auto survivor_id = survivor_bid.order_id_;
+    survivor.add(survivor_bid);
+
+    EXPECT_EQ(pin_node_pool().getNbElements(), pin_before + 1);
+    EXPECT_EQ(price_level_descriptor_pool().getNbElements(), level_before + 1);
+
+    {
+      Book book;
+      book.set_market_price(100);
+
+      // One live order in each of the four independently owned narb_trees:
+      // bids, asks, parked buy stops, and parked sell stops.
+      book.add(SimpleOrder(true,   90, 10));
+      book.add(SimpleOrder(false, 110, 10));
+      book.add(SimpleOrder(true,   95, 10, 101));
+      book.add(SimpleOrder(false, 105, 10,  99));
+
+      EXPECT_EQ(pin_node_pool().getNbElements(), pin_before + 5);
+      EXPECT_EQ(price_level_descriptor_pool().getNbElements(), level_before + 5);
+    }
+
+    // Destroying one book returned only its four trees' allocations.
+    EXPECT_EQ(pin_node_pool().getNbElements(), pin_before + 1);
+    EXPECT_EQ(price_level_descriptor_pool().getNbElements(), level_before + 1);
+    EXPECT_NE(survivor.bids().find_order(survivor_id), nullptr);
+  }
+
+  EXPECT_EQ(pin_node_pool().getNbElements(), pin_before);
+  EXPECT_EQ(price_level_descriptor_pool().getNbElements(), level_before);
+}
 
 // A resting sell is fully consumed by a matching buy; unrelated levels survive.
 TEST_F(Fixture, AddCompleteBid)
