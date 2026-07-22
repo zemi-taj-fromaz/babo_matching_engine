@@ -51,6 +51,46 @@ That's it. The **easiest way to see it work** is the standalone perf binaries
 
 ---
 
+## Use babobook as a library
+
+`babo_basic_book` is a small integration example showing book construction, a
+synchronous listener, resting orders, a maker-price fill, cancellation, and
+pull-based depth:
+
+```bash
+cmake --build cmake-build-release --target babo_basic_book
+./cmake-build-release/examples/babo_basic_book
+```
+
+Output:
+
+```text
+accept  id=1
+accept  id=2
+
+after resting orders
+bids: 100@10(1)
+asks: 105@7(1)
+accept  id=3
+fill    maker=1 taker=3 qty=4 price=100
+
+after match
+bids: 100@6(1)
+asks: 105@7(1)
+cancel  id=2
+
+after cancel
+bids: 100@6(1)
+asks: empty
+```
+
+The example source is [`examples/basic_book.cpp`](examples/basic_book.cpp).
+Complexity guarantees, the precise meaning of O(1) cancel, threading and
+reentrancy rules, ownership/pool lifetime, numeric limits, listener ordering, and
+depth snapshot lifetime are documented in [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md).
+
+---
+
 ## Try it: the perf binaries (easiest path)
 
 Two self-contained micro-benchmarks live in `<build>/perf/`. They link an engine
@@ -319,6 +359,8 @@ the state audit to `PASS`.
 | `perf/` | two canonical, core-pinned throughput binaries plus opt-in capacity variants |
 | `scripts/` | correctness, comparison, payload-scaling, and portable result-bundle runners |
 | `test/` | unit tests (`babo_unit`, `liqui_unit`) |
+| `examples/` | minimal native-library integration example |
+| `docs/API_CONTRACT.md` | public complexity, threading, lifetime, numeric, and listener contract |
 
 ### How babo is fast
 

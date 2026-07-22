@@ -10,3 +10,11 @@ target_include_directories(babobook PUBLIC
 )
 
 target_compile_features(babobook PUBLIC cxx_std_20)
+
+# Always build the minimal integration example with the library. Besides being
+# executable documentation, this keeps the public API usage compile-checked.
+add_executable(babo_basic_book
+        ${PROJECT_SOURCE_DIR}/examples/basic_book.cpp
+)
+target_link_libraries(babo_basic_book PRIVATE babobook)
+target_compile_features(babo_basic_book PRIVATE cxx_std_20)
