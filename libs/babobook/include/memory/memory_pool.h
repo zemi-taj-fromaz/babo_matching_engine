@@ -208,19 +208,16 @@ protected:
     }
 
 private:
-    /** Current size of the memory pool */
     size_t size {0};
-
-    /** Current number of elements allocated in the memory pool */
     size_t nbElements{0};
 
-    /** High-water mark - highest index ever allocated */
+    /* High-water mark - highest index ever allocated */
     size_t maxAllocatedIndex {0};
 
-    /** Pointer to the next free object in the pool */
+    /* Pointer to the next free object in the pool */
     MemChunk<T>* freeList {nullptr};
 
-    /** MemChunk lists used by the pool and retained for block destruction. */
+    /* MemChunk lists used by the pool and retained for block destruction. */
     std::vector<MemChunk<T>*> chunkList;
 };
 

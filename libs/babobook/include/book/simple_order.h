@@ -18,11 +18,8 @@ enum OrderState {
   os_rejected
 };
 
-/// @brief A concrete, non-polymorphic order stored by value in the book's PIN slots.
 class SimpleOrder {
 public:
-  /// @brief Produces an empty placeholder order (order_id_ == 0).
-  /// Placeholder slots are never reached because their links stay npos.
   SimpleOrder();
 
   SimpleOrder(bool is_buy,
@@ -31,7 +28,6 @@ public:
               std::uint32_t stop_price = 0,
               book::OrderConditions conditions = book::OrderCondition::oc_no_conditions);
 
-  /// @brief Test hook: make the next generated order id equal to 1.
   static void reset_id_generator() { last_order_id_ = 0; }
 
   const OrderState& state() const;
@@ -42,7 +38,6 @@ public:
   std::uint32_t order_qty() const;
   std::uint32_t open_qty() const;
 
-  /// @brief Adjust tentative AON reservation and return remaining availability.
   std::uint32_t reserve(std::int32_t reserved);
 
   bool filled() const;
