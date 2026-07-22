@@ -38,9 +38,9 @@ include(CompilerSettings)
 # of babobook variants.
 option(BABO_BUILD_PIN_SWEEP "Also build the non-default pin_node capacities (babo_cap{16,32,128}_perf)" OFF)
 
-# --- Static libraries to compare ---
+# --- Engine targets to compare ---
 # liquibook_ref: vendored reference engine (in-tree, frozen baseline).
-# babo_book:     your own engine (you'll be writing this).
+# babobook:      header-only matching engine target.
 add_subdirectory(libs/liquibook)
 add_subdirectory(libs/babobook)
 add_subdirectory(test/babo_test)
@@ -49,7 +49,7 @@ add_subdirectory(benchmark)
 
 # --- Order-book perf executables ---
 # Defined in perf/CMakeLists.txt; added here after the engine libraries so the
-# perf targets can link liquibook_ref / babobook.
+# perf targets can consume liquibook_ref / babobook::babobook.
 add_subdirectory(perf)
 # --- Benchmark / comparison harness ---
 #add_subdirectory(bench)

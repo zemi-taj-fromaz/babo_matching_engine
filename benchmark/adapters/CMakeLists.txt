@@ -5,9 +5,9 @@
 
 # helper: one SHARED adapter target with the shared property set and optional
 # compile definitions.
-function(add_adapter target source engine_lib)
+function(add_adapter target source engine_target)
     add_library(${target} SHARED ${source})
-    target_link_libraries(${target} PRIVATE ${engine_lib})
+    target_link_libraries(${target} PRIVATE ${engine_target})
     set_target_properties(${target} PROPERTIES
             WINDOWS_EXPORT_ALL_SYMBOLS ON
             PREFIX "")
@@ -16,5 +16,5 @@ function(add_adapter target source engine_lib)
     endif()
 endfunction()
 
-add_adapter(babobook_adapter   babobook_adapter.cpp   babobook)
+add_adapter(babobook_adapter   babobook_adapter.cpp   babobook::babobook)
 add_adapter(liquibook_adapter  liquibook_adapter.cpp  liquibook_ref)

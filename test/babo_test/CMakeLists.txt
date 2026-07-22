@@ -6,7 +6,7 @@
 file(GLOB_RECURSE TEST_FILES CONFIGURE_DEPENDS "*.h" "*.cpp")
 
 add_executable(babo_unit ${TEST_FILES})
-target_link_libraries(babo_unit PRIVATE babobook GTest::gtest_main)
+target_link_libraries(babo_unit PRIVATE babobook::babobook GTest::gtest_main)
 target_include_directories(babo_unit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 include(GoogleTest)
