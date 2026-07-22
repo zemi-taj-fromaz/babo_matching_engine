@@ -13,7 +13,7 @@ namespace babo  {
 
 struct order_loc
 {
-    pin_node_t* pin_loc;   // the concrete pin_node type (pin_node<kNodeCapacity>)
+    pin_node_t* pin_loc;   // the concrete pin_node
     uint16_t index;        // slot index within pin_loc
 
     [[nodiscard]] bool valid() const noexcept { return pin_loc != nullptr; }
@@ -22,9 +22,7 @@ struct order_loc
 
 enum class color : uint8_t {RED, BLACK};
 
-// Pure metadata for a price level. It does NOT own PIN nodes -- orders live in the tree's
-// single global PIN chain. _head/_tail point at this level's first/last orders in that chain
-// (its contiguous priority sub-range). The chain layer (narb_tree) maintains them.
+// Metadata for a price level. It does not own pin_nodes -- orders live in the narb_trees global pin chain
 struct price_level_descriptor
 {
     price_level_descriptor *left, *right, *parent;

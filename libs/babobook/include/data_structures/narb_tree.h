@@ -8,7 +8,6 @@
 #include "price_level_descriptor.h"
 
 #include <cstdint>
-#include <cstddef>
 #include <iterator>
 #include <type_traits>
 #include <unordered_map>
@@ -27,8 +26,6 @@ template <order_type type>
 class narb_tree
 {
 public:
-    using value_type = std::pair<price_level_descriptor*, simple::SimpleOrder>;
-
     narb_tree() = default;
     ~narb_tree() noexcept { clear(); }
 
@@ -37,9 +34,6 @@ public:
     narb_tree(narb_tree&&) = delete;
     narb_tree& operator=(narb_tree&&) = delete;
 
-    // Return only this tree's live allocations to the process-wide pools.
-    // The pools are shared by every side/tree/book, so destroyAll() must never
-    // be called here.
     void clear() noexcept
     {
         pin_node_t* node = _chain_head;
@@ -88,9 +82,7 @@ public:
         iterator_impl() noexcept : _node(nullptr) {}
         explicit iterator_impl(pointer n) noexcept : _node(n) {}
 
-        // implicit iterator -> const_iterator conversion (not the reverse).
-        // Templated so it is never mistaken for a copy constructor (which would
-        // otherwise suppress the implicit copy ctor when Const == false).
+
         template <bool OtherConst>
             requires (Const && !OtherConst)
         iterator_impl(const iterator_impl<OtherConst>& other) noexcept
@@ -194,15 +186,10 @@ public:
     }
     order_iterator orders_end() noexcept { return order_iterator{this, {nullptr, 0}}; }
 
-    // Insert an order into the book, keyed by `key` (the price the tree orders on).
-    //  Branch 1 (O(1) fast path): does it land on, or between, best and second-best?
-    //  Branch 2 (general): find_neighbors, then place into an existing level or a new one.
+
     void insert(simple::SimpleOrder& order, std::uint64_t key);
-    // Convenience: key on the order's limit price (the normal resting-book case).
     void insert(simple::SimpleOrder& order) { insert(order, order.price()); }
 
-    // O(1) cancel by order id: locate the slot, unlink it from the PIN chain, and
-    // clean up an emptied node (and, if the level empties, the level).
     void erase(std::uint32_t order_id);
 
     // Debug/testing: verify the red-black invariants (BST order, root black, no red-red,
@@ -211,25 +198,18 @@ public:
 
 
 private:
-    // Locate the level node at `price` (nullptr if absent). Backs find().
     [[nodiscard]] price_level_descriptor* find_node(std::uint64_t price) const;
 
-    // Allocate + initialise a new price level for the given price.
     price_level_descriptor* make_level(std::uint64_t price);
-    // Place an order into the global PIN chain (at this level's tail sub-range) + index it.
     void place_order(price_level_descriptor* level, simple::SimpleOrder& order);
 
     // --- global PIN chain helpers ---
-    // Global priority order: _chain_head (best) ... _chain_tail (worst); within a node,
-    // head_->tail_ intra-node links; across nodes, next_node_/prev_node_.
     order_loc chain_first(simple::SimpleOrder&& ord, price_level_descriptor* lvl);           // empty chain
     order_loc chain_insert_head(simple::SimpleOrder&& ord, price_level_descriptor* lvl);      // new global best
     order_loc chain_insert_after(order_loc anchor, simple::SimpleOrder&& ord, price_level_descriptor* lvl);
     [[nodiscard]] order_loc global_next(order_loc loc) const;   // next order in global priority order
     [[nodiscard]] order_loc global_prev(order_loc loc) const;   // previous order
 
-    // Relocation cascade: guarantee X has a free slot by rippling boundary orders toward the
-    // tail (reuse a free slot within D_max, else allocate a node at the boundary).
     static constexpr int kMaxCascadeHops = 16;
     void make_room(pin_node_t* X);
     void relocate_tail_to_head(pin_node_t* src, pin_node_t* dst);   // one Push Back hop
