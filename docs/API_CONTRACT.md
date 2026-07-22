@@ -10,8 +10,9 @@ Include `book/matching_book.h`, construct a scoped book, register an optional
 `OrderListener`, and submit `simple::SimpleOrder` values. The book stores resting
 and parked orders by value; callers subsequently address them by order ID.
 
-See [`examples/basic_book.cpp`](../examples/basic_book.cpp) for a complete
-add/match/cancel/depth program.
+See [`libs/babobook/examples/basic_book.cpp`](../libs/babobook/examples/basic_book.cpp)
+and its adjacent `CMakeLists.txt` for a complete add/match/cancel/depth program
+and the minimal CMake linkage.
 
 ## Complexity
 

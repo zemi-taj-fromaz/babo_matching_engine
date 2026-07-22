@@ -59,7 +59,7 @@ pull-based depth:
 
 ```bash
 cmake --build cmake-build-release --target babo_basic_book
-./cmake-build-release/examples/babo_basic_book
+./cmake-build-release/libs/babobook/examples/babo_basic_book
 ```
 
 Output:
@@ -84,7 +84,10 @@ bids: 100@6(1)
 asks: empty
 ```
 
-The example source is [`examples/basic_book.cpp`](examples/basic_book.cpp).
+The example source and its consumer-side CMake setup are in
+[`libs/babobook/examples/`](libs/babobook/examples/). `babobook` itself is a
+header-only CMake target; linking it propagates the include path and C++20
+requirement without adding a library binary.
 Complexity guarantees, the precise meaning of O(1) cancel, threading and
 reentrancy rules, ownership/pool lifetime, numeric limits, listener ordering, and
 depth snapshot lifetime are documented in [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md).
@@ -352,14 +355,13 @@ the state audit to `PASS`.
 
 | Path | What |
 |---|---|
-| `libs/babobook/` | the **babo** engine — `matching_book<SIZE>`, header-only + one `.cpp` |
+| `libs/babobook/` | the header-only **babo** engine and its always-built integration example |
 | `libs/liquibook/` | the vendored reference engine (frozen) |
 | `benchmark/` | the plugin **harness** + the C-ABI contract (`api/matching_engine_api.h`) |
 | `benchmark/adapters/` | each order book wrapped behind the ABI as a canonical shared lib |
 | `perf/` | two canonical, core-pinned throughput binaries plus opt-in capacity variants |
 | `scripts/` | correctness, comparison, payload-scaling, and portable result-bundle runners |
 | `test/` | unit tests (`babo_unit`, `liqui_unit`) |
-| `examples/` | minimal native-library integration example |
 | `docs/API_CONTRACT.md` | public complexity, threading, lifetime, numeric, and listener contract |
 
 ### How babo is fast

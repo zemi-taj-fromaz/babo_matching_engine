@@ -10,7 +10,7 @@
 #include "scaling_common.h"
 
 #include <book/matching_book.h>
-#include <simple/simple_order.h>
+#include <book/simple_order.h>
 
 #include <chrono>
 #include <cstdint>

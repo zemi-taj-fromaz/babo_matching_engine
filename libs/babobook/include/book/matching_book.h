@@ -9,7 +9,7 @@
 #define BABOMATCHINGENGINE_MATCHING_BOOK_H
 
 #include "../data_structures/narb_tree.h"
-#include "../simple/simple_order.h"
+#include "simple_order.h"
 #include "types.h"
 #include "depth.h"
 #include "order_listener.h"

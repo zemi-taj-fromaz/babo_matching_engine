@@ -17,7 +17,7 @@
 #include "../api/matching_engine_api.h"
 
 #include <book/matching_book.h>
-#include <simple/simple_order.h>
+#include <book/simple_order.h>
 
 #include <cstdint>
 

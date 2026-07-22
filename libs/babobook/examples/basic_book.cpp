@@ -1,10 +1,8 @@
 #include <book/depth_constants.h>
 #include <book/matching_book.h>
 #include <book/order_listener.h>
-#include <simple/simple_order.h>
+#include <book/simple_order.h>
 
-#include <cstddef>
-#include <cstdint>
 #include <iostream>
 #include <string_view>
 
