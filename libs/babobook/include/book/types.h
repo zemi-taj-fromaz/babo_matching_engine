@@ -10,8 +10,7 @@
 namespace babo::book {
 using  OrderConditions = uint32_t;
 
-// Unscoped on purpose: these are bitmask flag values that combine into an
-// OrderConditions (uint32_t). Scoped access (OrderCondition::oc_*) still works.
+// Unscoped on purpose: these are bitmask flag values that can be combined into eachother
 enum OrderCondition : uint32_t {
   oc_no_conditions = 0,
   oc_all_or_none = 1,
