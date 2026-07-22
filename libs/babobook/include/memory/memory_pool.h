@@ -77,7 +77,6 @@ public:
         if (index > maxAllocatedIndex)
             maxAllocatedIndex = index;
 
-        // Todo Check if the chunk was created before creating a new element
         MemChunk<T>* chunk = getChunk(index);
 
         return std::construct_at(
@@ -128,8 +127,6 @@ public:
 
         return {ptr, index};
     }
-
-    // Todo add a bulk allocation and deallocation function
 
     void release(T* pointer)
     {
