@@ -5,7 +5,8 @@
 #ifndef BABOMATCHINGENGINE_MEMORY_POOL_H
 #define BABOMATCHINGENGINE_MEMORY_POOL_H
 
-#include <type_traits>
+#include <cstddef>
+#include <memory>
 #include <vector>
 #include <utility>
 #include <unordered_set>
@@ -15,10 +16,12 @@ namespace babo::memory
 
 
 template <typename T>
-union PGMemChunk
+union MemChunk
 {
-    typename std::aligned_storage<sizeof(T), alignof(T)>::type element;
-    PGMemChunk *next;
+    alignas(T) std::byte storage[sizeof(T)];
+    MemChunk* next;
+
+    constexpr MemChunk() noexcept : next(nullptr) {}
 };
 
 
@@ -31,7 +34,7 @@ public:
 
     ~AllocatorPool()
     {
-        for (PGMemChunk<T>* chunk : chunkList)
+        for (MemChunk<T>* chunk : chunkList)
             delete[] chunk;  // Use delete[] to match new[]
     }
 
@@ -41,11 +44,9 @@ public:
 
         while (reserveSize >= size)
         {
-            const size_t blockSize = N >= 2 ? N : size == 0 ? 64 : size;
-
-            auto newBlock = new PGMemChunk<T>[blockSize];
+            auto newBlock = new MemChunk<T>[N];
             chunkList.push_back(newBlock);
-            size += blockSize;
+            size += N;
         }
     }
 
@@ -59,11 +60,13 @@ public:
             auto chunk = freeList;
             freeList = chunk->next;
 
-            ::new(&(chunk->element)) T(std::forward<Args>(args)...);
+            T* object = std::construct_at(
+                reinterpret_cast<T*>(chunk->storage),
+                std::forward<Args>(args)...);
 
             nbElements++;
 
-            return reinterpret_cast<T*>(chunk);
+            return object;
         }
 
         const size_t index = nbElements++;
@@ -75,9 +78,11 @@ public:
             maxAllocatedIndex = index;
 
         // Todo Check if the chunk was created before creating a new element
-        PGMemChunk<T>* chunk = getChunk(index);
+        MemChunk<T>* chunk = getChunk(index);
 
-        return ::new(&(chunk->element)) T(std::forward<Args>(args)...);
+        return std::construct_at(
+            reinterpret_cast<T*>(chunk->storage),
+            std::forward<Args>(args)...);
     }
 
     template <typename... Args>
@@ -88,12 +93,13 @@ public:
             auto chunk = freeList;
             freeList = chunk->next;
 
-            ::new(&(chunk->element)) T(std::forward<Args>(args)...);
+            T* ptr = std::construct_at(
+                reinterpret_cast<T*>(chunk->storage),
+                std::forward<Args>(args)...);
 
             nbElements++;
 
             // Find the index by calculating from chunk pointer
-            T* ptr = reinterpret_cast<T*>(chunk);
             size_t index = 0;
             for (size_t i = 0; i < size; i++)
             {
@@ -115,8 +121,10 @@ public:
         if (index > maxAllocatedIndex)
             maxAllocatedIndex = index;
 
-        PGMemChunk<T>* chunk = getChunk(index);
-        T* ptr = ::new(&(chunk->element)) T(std::forward<Args>(args)...);
+        MemChunk<T>* chunk = getChunk(index);
+        T* ptr = std::construct_at(
+            reinterpret_cast<T*>(chunk->storage),
+            std::forward<Args>(args)...);
 
         return {ptr, index};
     }
@@ -127,10 +135,10 @@ public:
     {
         if (pointer != nullptr)
         {
-            pointer->~T();
+            std::destroy_at(pointer);
 
-            reinterpret_cast<PGMemChunk<T>*>(pointer)->next = freeList;
-            freeList = reinterpret_cast<PGMemChunk<T>*>(pointer);
+            reinterpret_cast<MemChunk<T>*>(pointer)->next = freeList;
+            freeList = reinterpret_cast<MemChunk<T>*>(pointer);
 
             nbElements--;
         }
@@ -146,8 +154,8 @@ public:
             return;
 
         // Build a set of free-list pointers for O(1) membership testing.
-        std::unordered_set<PGMemChunk<T>*> freeSet;
-        PGMemChunk<T>* current = freeList;
+        std::unordered_set<MemChunk<T>*> freeSet;
+        MemChunk<T>* current = freeList;
         while (current != nullptr)
         {
             freeSet.insert(current);
@@ -157,12 +165,12 @@ public:
         // Iterate through all allocated indices and destroy objects not in free list
         for (size_t i = 0; i <= maxAllocatedIndex && i < size; ++i)
         {
-            PGMemChunk<T>* chunk = getChunk(i);
+            MemChunk<T>* chunk = getChunk(i);
             if (freeSet.find(chunk) == freeSet.end())
             {
                 // This object is still allocated, destroy it
-                T* obj = reinterpret_cast<T*>(chunk);
-                obj->~T();
+                T* obj = std::launder(reinterpret_cast<T*>(chunk->storage));
+                std::destroy_at(obj);
             }
         }
 
@@ -173,7 +181,7 @@ public:
 
     T* getSlot(size_t index) const
     {
-        return reinterpret_cast<T*>(getChunk(index));
+        return std::launder(reinterpret_cast<T*>(getChunk(index)->storage));
     }
 
     void advanceCount(size_t n)
@@ -192,26 +200,14 @@ public:
             return nullptr;
         }
 
-        return reinterpret_cast<T*>(getChunk(index));
+        return std::launder(reinterpret_cast<T*>(getChunk(index)->storage));
     }
 
 protected:
 
-    inline PGMemChunk<T>* getChunk(size_t index) const
+    inline MemChunk<T>* getChunk(size_t index) const
     {
-
-        if (N >= 2)
-            return &chunkList[index / N][index % N];
-
-        // Block layout (N == 1):
-        //   Block 0          : indices [0,   63], size = 64
-        //   Block k (k >= 1) : indices [2^(k+5), 2^(k+6) - 1], size = 2^(k+5)
-        // For index < 64: block 0, offset = index
-        // For index >= 64: n = floor(log2(index)), listPos = n - 5, offset = index - 2^n
-        if (index < 64)
-            return &chunkList[0][index];
-
-        return nullptr;
+        return &chunkList[index / N][index % N];
     }
 
 private:
@@ -225,10 +221,10 @@ private:
     size_t maxAllocatedIndex {0};
 
     /** Pointer to the next free object in the pool */
-    PGMemChunk<T>* freeList {nullptr};
+    MemChunk<T>* freeList {nullptr};
 
-    /** PGMemChunk Lists used in the pool (used to free the memory) */
-    std::vector<PGMemChunk<T>*> chunkList;
+    /** MemChunk lists used by the pool and retained for block destruction. */
+    std::vector<MemChunk<T>*> chunkList;
 };
 
 }
