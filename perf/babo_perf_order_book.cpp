@@ -34,11 +34,7 @@ static constexpr int kMeasuredReps = 100;       // dilutes startup/load/print no
 // no-depth perf matrix because it measured no meaningful difference after the
 // pull-based optimization.
 static constexpr const char* kEngineName = "babobook";
-#ifdef BABO_NO_DEPTH
-static constexpr bool kDepthOn = false;
-#else
 static constexpr bool kDepthOn = true;
-#endif
 
 namespace {
 

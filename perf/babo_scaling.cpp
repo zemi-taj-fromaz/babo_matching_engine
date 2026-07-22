@@ -25,11 +25,7 @@ using clk    = std::chrono::steady_clock;
 static constexpr unsigned kBenchCore = 5;
 
 static constexpr const char* kEngineName = "babobook";
-#ifdef BABO_NO_DEPTH
-static constexpr bool kDepthOn = false;
-#else
 static constexpr bool kDepthOn = true;
-#endif
 
 namespace {
 

@@ -15,7 +15,6 @@
 #include "order_listener.h"
 
 #include <algorithm>
-#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -25,21 +24,12 @@ template <int SIZE = 5>
 class matching_book
 {
 public:
-    using DepthTracker = book::Depth<SIZE>;
+    using DepthSnapshot = book::Depth<SIZE>;
 
-    // Order events are keyed by order id (the OrderListener template's handle type).
     using OrderEventListener = book::OrderListener<std::uint32_t>;
 
-    // --- listener registration ---
     void set_order_listener(OrderEventListener* l) noexcept { order_listener_ = l; }
-    // NOTE: depth is now PULL-based -- query depth() when you want a snapshot. There is
-    // no per-op depth/bbo push listener; a market-data publisher derives depth off the
-    // hot path from the order-event stream (or by calling depth()), mirroring how real
-    // exchanges separate matching from market-data dissemination.
 
-    // Submit an order. Rejected if size is zero; stop orders whose trigger hasn't been reached
-    // are parked; otherwise it matches the opposite side (market crosses everything) and any
-    // remainder rests.
     void add(simple::SimpleOrder order)
     {
         if (order.order_qty() == 0)
@@ -47,7 +37,7 @@ public:
             if (order_listener_) order_listener_->on_reject(order.order_id_, "size must be positive");
             return;
         }
-        if (order_listener_) order_listener_->on_accept(order.order_id_);   // accepted into the book
+        if (order_listener_) order_listener_->on_accept(order.order_id_);
 
         if (order.stop_price() != 0 && is_stopped(order))
             park_stop(order);                                  // held until the market reaches it
@@ -58,12 +48,11 @@ public:
         }
     }
 
-    // Cancel by id (resting book or a parked stop).
     void cancel(std::uint32_t order_id)
     {
         bool found = cancel_side(order_id, bids_, /*is_buy=*/true)
                   || cancel_side(order_id, asks_, /*is_buy=*/false);
-        if (!found)   // maybe a parked stop (not in depth)
+        if (!found)
         {
             if      (stopBids_.find_order(order_id)) { stopBids_.erase(order_id); found = true; }
             else if (stopAsks_.find_order(order_id)) { stopAsks_.erase(order_id); found = true; }
@@ -78,13 +67,6 @@ public:
         }
     }
 
-    // Replace/modify a resting order by id: change size (delta) and/or price, keeping the same id.
-    //   - price unchanged  -> edit the size IN PLACE. A resting order never crosses its own side,
-    //                         so a pure size change can't match; we keep the slot (and thus time
-    //                         priority) and only adjust the level/depth quantities.
-    //   - price changed    -> cancel + re-submit (the new price may cross, and a reprice
-    //                         legitimately loses time priority).
-    // new_price == PRICE_UNCHANGED (0) keeps the current price.
     void replace(std::uint32_t order_id, std::int32_t size_delta, std::uint64_t new_price)
     {
         // Locate the resting order and its side (bids_ and asks_ are distinct types -> branch).
@@ -100,11 +82,9 @@ public:
         const std::uint64_t cur_price = o->price();
         const bool reprice = (new_price != book::PRICE_UNCHANGED && new_price != cur_price);
 
-        // --- fast path: size-only change, done in place (time priority retained) ---
         if (!reprice)
         {
             const std::uint32_t open = o->open_qty();
-            // A reduction that meets/exceeds the open qty collapses the order -> cancel it.
             if (size_delta < 0 && static_cast<std::uint32_t>(-size_delta) >= open)
             {
                 if (is_buy) bids_.erase(order_id); else asks_.erase(order_id);
@@ -120,7 +100,6 @@ public:
             return;
         }
 
-        // --- slow path: price changed, so cancel + re-submit ---
         simple::SimpleOrder copy = *o;
         if (is_buy) bids_.erase(order_id); else asks_.erase(order_id);
 
@@ -128,12 +107,11 @@ public:
         if (order_listener_)
             order_listener_->on_replace(order_id, size_delta, static_cast<std::uint32_t>(copy.price()));
 
-        if (copy.open_qty() == 0) return;   // reduced to nothing -> cancelled
+        if (copy.open_qty() == 0) return;
         submit(copy);
         process_triggered();
     }
 
-    // Externally set the market price (e.g. from a reference feed); triggers crossed stops.
     void set_market_price(std::uint64_t px)
     {
         marketPrice_ = px;
@@ -144,22 +122,15 @@ public:
 
     [[nodiscard]] narb_tree<order_type::BID>& bids() noexcept { return bids_; }
     [[nodiscard]] narb_tree<order_type::ASK>& asks() noexcept { return asks_; }
-    // Aggregate top-of-book depth, DERIVED on demand: walk each side's top-SIZE price
-    // levels best-first and read the qty/count that every price_level_descriptor already
-    // carries. O(SIZE) per call, and the matching hot path pays nothing. Compiled out
-    // under BABO_NO_DEPTH. Non-const: it repopulates the snapshot buffer in place.
-#ifndef BABO_NO_DEPTH
-    [[nodiscard]] DepthTracker& depth() noexcept
+
+    [[nodiscard]] DepthSnapshot& depth() noexcept
     {
         depth_.clear();
         fill_depth_side(bids_, depth_.bids());
         fill_depth_side(asks_, depth_.asks());
         return depth_;
     }
-#endif
-
 private:
-    // Match against the opposite side, then rest the remainder (unless market/IOC).
     void submit(simple::SimpleOrder& order)
     {
         const bool is_market = (order.price() == book::MARKET_ORDER_PRICE);
@@ -173,10 +144,6 @@ private:
         }
     }
 
-#ifndef BABO_NO_DEPTH
-    // Fill `out[0..SIZE)` from a side's top-SIZE price levels, best-first. Each level's
-    // qty/count are read straight off the price_level_descriptor. Unfilled slots stay
-    // empty (cleared by depth()). O(SIZE); the walked levels are the hottest in the tree.
     template <class SideTree>
     static void fill_depth_side(SideTree& tree, book::DepthLevel* out) noexcept
     {
@@ -184,9 +151,6 @@ private:
         for (auto it = tree.begin(); it != tree.end() && i < SIZE; ++it, ++i)
             out[i].set(static_cast<std::uint32_t>(it->_price), it->_quantity, it->_count);
     }
-#endif
-
-    // A resting maker at its price crosses the incoming (a market incoming crosses everything).
     static bool crosses(const simple::SimpleOrder& maker, const simple::SimpleOrder& in) noexcept
     {
         if (in.price() == book::MARKET_ORDER_PRICE) return true;
@@ -194,8 +158,6 @@ private:
                            : (maker.price() >= in.price());
     }
 
-    // Execute one fill between the incoming order and a resting maker. Updates depth and
-    // market price, then emits the canonical fill event. Returns whether the maker filled.
     bool execute_trade(simple::SimpleOrder& in, simple::SimpleOrder& maker, std::uint32_t qty)
     {
         const std::uint64_t px   = maker.price();
@@ -230,7 +192,7 @@ private:
 
             const std::uint32_t qty = (std::min)(in.open_qty(), maker.open_qty());
             const std::uint32_t id  = maker.order_id_;
-            ++it;                                          // advance before a possible erase
+            ++it;
             if (execute_trade(in, maker, qty)) opp.erase(id);
         }
     }
@@ -280,7 +242,6 @@ private:
         return true;
     }
 
-    // --- stop orders ---
     [[nodiscard]] bool is_stopped(const simple::SimpleOrder& o) const noexcept
     {
         return o.is_buy() ? (marketPrice_ < o.stop_price())
@@ -325,9 +286,7 @@ private:
     narb_tree<order_type::ASK> asks_;      // resting sell orders
     narb_tree<order_type::ASK> stopBids_;  // parked BUY stops, keyed by stop price (lowest first)
     narb_tree<order_type::BID> stopAsks_;  // parked SELL stops, keyed by stop price (highest first)
-#ifndef BABO_NO_DEPTH
     book::Depth<SIZE> depth_;              // top-of-book snapshot, rebuilt on depth() (pull-based)
-#endif
 
     OrderEventListener* order_listener_ = nullptr;
     std::uint64_t marketPrice_ = 0;        // last trade / externally set reference price

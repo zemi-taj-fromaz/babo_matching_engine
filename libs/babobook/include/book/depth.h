@@ -8,18 +8,7 @@ namespace babo::book {
 
 /// @brief Aggregate top-of-book view: SIZE price levels per side, bids then asks.
 ///
-/// This is a passive SNAPSHOT, not an eagerly-maintained tracker. matching_book
-/// rebuilds it on demand (see matching_book::depth()) by walking the narb_tree's
-/// top-SIZE price levels best-first -- each price_level_descriptor already carries
-/// its aggregate qty (_quantity) and order count (_count), so filling a level is a
-/// direct read. Cost: O(SIZE) per QUERY, and *nothing* on the matching hot path.
-///
-/// This replaces the old liquibook-style tracker that updated on every
-/// add/fill/cancel and cached overflow levels in a std::map (a red-black-tree node
-/// allocation per deep order). The tree is already the complete ordered structure,
-/// so that excess map was pure redundancy: "the next level to promote" is just the
-/// next node in the walk. Deriving from the tree is a design liquibook's std::multimap
-/// book cannot cheaply match.
+/// This is a passive SNAPSHOT. matching_book rebuilds it on demand
 template <int SIZE = 5>
 class Depth {
 public:

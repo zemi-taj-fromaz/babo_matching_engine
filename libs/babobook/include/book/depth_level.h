@@ -13,10 +13,8 @@ namespace babo::book {
 /// @brief a single level of the limit order book aggregated by price
 class DepthLevel {
 public:
-  /// @brief construct
   DepthLevel();
 
-  /// @brief assign
   DepthLevel& operator=(const DepthLevel& rhs);
 
   const uint32_t& price() const;
@@ -26,57 +24,28 @@ public:
 
   void init(uint32_t price, bool is_excess);
 
-  /// @brief add an order to the level
-  /// @param qty open quantity of the order
+
   void add_order(uint32_t qty);
 
-  /// @brief increase the quantity of existing orders
-  /// @param qty amount to increase the quantity by
   void increase_qty(uint32_t qty);
 
-  /// @brief decrease the quantity of existing orders
-  /// @param qty amount to decrease the quantity by
+
   void decrease_qty(uint32_t qty);
 
-  /// @brief overwrite all values of the level
-  /// @param price the level price
-  /// @param qty the aggegate quantity
-  /// @param order_count the number of orders
-  /// @param last_change the last change ID (optional)
+
   void set(uint32_t price,
            uint32_t qty,
-           uint32_t order_count,
-           uint32_t last_change = 0);
+           uint32_t order_count);
 
-  /// @brief cancel or fill an order, decrease count and quantity
-  /// @param qty the closed quantity
-  /// @return true if the level is now empty
   bool close_order(uint32_t qty);
 
-  /// @brief set last changed stamp on this level
-  void last_change(uint32_t last_change) { last_change_ = last_change; }
-
-  /// @brief get last change stamp for this level
-  uint32_t last_change() const { return last_change_; }
-
-  /// @brief has the level changed since the given stamp?
-  /// @param last_published_change the stamp to compare to
-  bool changed_since(uint32_t last_published_change) const;
 
 private:
   uint32_t price_;
   uint32_t order_count_;
   uint32_t aggregate_qty_;
   bool is_excess_;
-public:
-  uint32_t last_change_;
 };
-
-inline bool
-DepthLevel::changed_since(uint32_t last_published_change) const
-{
-  return last_change_ > last_published_change;
-}
 
 inline DepthLevel::DepthLevel()
   : price_(INVALID_LEVEL_PRICE),
@@ -92,11 +61,6 @@ DepthLevel& DepthLevel::operator=(const DepthLevel& rhs)
   price_ = rhs.price_;
   order_count_ = rhs.order_count_;
   aggregate_qty_ = rhs.aggregate_qty_;
-  if (rhs.price_ != INVALID_LEVEL_PRICE) {
-    last_change_ = rhs.last_change_;
-  }
-
-  // Do not copy is_excess_
 
   return *this;
 }
@@ -171,13 +135,11 @@ inline
 void
 DepthLevel::set(uint32_t price,
   uint32_t qty,
-  uint32_t order_count,
-  uint32_t last_change)
+  uint32_t order_count)
 {
   price_ = price;
   aggregate_qty_ = qty;
   order_count_ = order_count;
-  last_change_ = last_change;
   is_excess_ = false;   // snapshot levels come straight from the tree, never "excess"
 }
 

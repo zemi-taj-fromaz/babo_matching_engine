@@ -13,10 +13,10 @@ namespace babo::test {
 
 using babo::book::DepthLevel;
 
-// Templated on the book type so `Book::DepthTracker` resolves to Depth<SIZE>.
+// Templated on the book type so `Book::DepthSnapshot` resolves to Depth<SIZE>.
 template <typename Book>
 class DepthCheck {
-  using SizedDepth = typename Book::DepthTracker;
+  using SizedDepth = typename Book::DepthSnapshot;
 
 public:
   explicit DepthCheck(const SizedDepth& depth)
