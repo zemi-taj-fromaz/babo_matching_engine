@@ -1,0 +1,9 @@
+The files benchmark/third_party/sha256.c and
+benchmark/third_party/sha256.h contain a public-domain SHA-256 implementation.
+
+Their source notice states:
+
+    This file is in the public domain.
+
+The implementation is a dependency-free FIPS 180-4 SHA-256 algorithm used by
+the benchmark harness for report-stream correctness hashes.
