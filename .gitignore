@@ -5,6 +5,10 @@ cmake-build-*/
 # CLion / IDE
 .idea/
 
+# Python runner cache
+__pycache__/
+*.py[cod]
+
 # Cross-machine paper data: keep the unzipped bundle folders, not the raw ZIPs
 # (the ZIP just duplicates the folder the aggregator reads).
 paper/data/**/*.zip

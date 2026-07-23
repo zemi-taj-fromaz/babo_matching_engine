@@ -28,13 +28,10 @@ cmake --build cmake-build-release -j            # builds everything
 cmake --build cmake-build-release --target harness generator liquibook_adapter babobook_adapter
 ```
 
-Depth is a **compile-time toggle** (`BABO_NO_DEPTH` / `LIQUI_NO_DEPTH`), **ON by
-default** — babo derives depth from the tree for ~free, so depth-on is the
-canonical build. `babobook_adapter` / `liquibook_adapter` / `babo_perf` /
-`liqui_perf` are depth-on. Two options add opt-in experiment binaries (OFF by
-default): `-DBABO_BUILD_NODEPTH=ON` builds the lean `*_nodepth_*` variants;
-`-DBABO_BUILD_PIN_SWEEP=ON` builds `babo_cap{16,32,64,128}_perf` (the `pin_node`
-capacity sweep, `-DBABO_PIN_CAPACITY=N`). The perf binaries print via a
+Depth is always available and pull-based, so it adds no matching-hot-path work
+unless queried. `-DBABO_BUILD_PIN_SWEEP=ON` builds the optional
+`babo_cap{16,32,128}_perf` capacity variants; the default capacity is 64. The
+perf binaries print via a
 dependency-free ANSI-color header (`perf/bench_log.h`) — no spdlog.
 
 - On Windows with the LLVM/clang toolchain, add
@@ -79,9 +76,9 @@ identical behavior; both take the build's **benchmark dir** as an argument.
 
 **Audit** (`--mode audit`) and the **perf/hardware-counter** micro-benchmarks are
 intentionally *not* scripted — see README. Audit is a once-per-engine pass/fail
-certification. The standalone core-pinned `perf/` binaries (`babo_perf`,
-`liqui_perf` by default, depth-on; `*_nodepth_perf` and `babo_cap*_perf` under the
-opt-in flags) link the engine directly with no adapter/shared-lib boundary and
+certification. The standalone core-pinned `perf/` binaries (`babo_perf` and
+`liqui_perf` by default; `babo_cap*_perf` under the opt-in capacity flag) link
+the engine directly with no adapter/shared-lib boundary and
 print a colored throughput report; they are the target for hardware-counter
 profiling and the depth / capacity experiments.
 
@@ -89,8 +86,8 @@ profiling and the depth / capacity experiments.
 
 Three layers, decoupled by the C ABI:
 
-- **Engines** (`libs/`): `babobook` (the engine under development, header-only in
-  `include/`, one `.cpp`) and `liquibook_ref` (vendored, frozen). Nothing C++
+- **Engines** (`libs/`): `babobook` (the header-only engine under development) and
+  `liquibook_ref` (vendored, frozen). Nothing C++
   crosses the harness↔engine boundary — it's pure C ABI, which is why each module
   safely carries its own statically-linked runtime.
 - **Adapters** (`benchmark/adapters/`): each engine wrapped as a `SHARED` lib
@@ -99,10 +96,8 @@ Three layers, decoupled by the C ABI:
   `engine_query_*`). Optional exports: `engine_get_transport`, `engine_prebuild`,
   `engine_on_batch` — read the header comments before implementing these, they carry
   strict anti-cheat contracts. `template_adapter.h.cpp` is the starting skeleton.
-  `{babobook,liquibook}_adapter` are the depth-on default; the depth-off
-  `{babobook,liquibook}_nodepth_adapter` build only under `-DBABO_BUILD_NODEPTH=ON`.
-  `liqui_book_type.h` selects the liquibook book type (`SimpleOrderBook` vs a
-  depth-free `NoDepthBook`) and is shared with `liqui_perf`.
+  `{babobook,liquibook}_adapter` are the canonical adapter targets.
+  `liqui_book_type.h` defines the Liquibook type shared with `liqui_perf`.
 - **Harness** (`benchmark/src/`): `dlopen`s an adapter, replays a deterministic
   workload, drains the engine's report stream over an SPSC transport on an adjacent
   core, hashes it (`third_party/sha256.c`), and compares to the reference. Reports
@@ -117,7 +112,7 @@ Three layers, decoupled by the C ABI:
   purely by order id. Handles new/cancel/replace/market-price,
   IOC, AON, and stop orders (parked in separate `narb_tree`s keyed by stop price).
   Emits canonical order-domain events through one id-based `OrderListener`.
-  Depth is **pull-based**: `depth()` (compiled out under `BABO_NO_DEPTH`) derives the
+  Depth is **pull-based**: `depth()` derives the
   top-SIZE aggregate on demand by walking the tree's best-first level threads and
   reading each `price_level_descriptor`'s `_quantity`/`_count` — nothing on the hot
   path. (The old eager `Depth` + `std::map` excess tracker was removed.)
@@ -127,7 +122,7 @@ Three layers, decoupled by the C ABI:
   region, intrusive prev/next links, O(1) insert/erase (slots never move). This is
   the cache-aware structure that gives babo its O(1) cancel (vs liquibook's O(n)
   `find_on_market` scan — the source of the `static`-scenario speedup).
-- `memory/memory_pool.h`, `simple/simple_order.h`, `book/depth.h` — arena, order
+- `memory/memory_pool.h`, `book/simple_order.h`, `book/depth.h` — arena, order
   value type, and a passive top-of-book depth **snapshot** (filled by the walk in
   `matching_book::depth()`; no per-op maintenance).
 - **Threading/lifetime contract:** all books in one process share two unsynchronized
@@ -156,13 +151,8 @@ Three layers, decoupled by the C ABI:
   per-deep-order allocation is gone. Depth/bbo **push** listeners removed — depth is
   pull-only. `ut_depth.cpp` trimmed to the walk-based tests; `changed_checker.h`
   deleted. Result: depth-on ≈ depth-off in throughput.
-- **Depth is a compile-time toggle, ON by default.** `BABO_NO_DEPTH` / `LIQUI_NO_DEPTH`.
-  Two opt-in options (both OFF): `-DBABO_BUILD_NODEPTH=ON` (adds `*_nodepth_*`
-  adapters/perf), `-DBABO_BUILD_PIN_SWEEP=ON` (adds `babo_cap{16,32,64,128}_perf`,
-  via `-DBABO_PIN_CAPACITY=N`). Default build is depth-on + lean.
-- **Fair liquibook comparison.** `benchmark/adapters/liqui_book_type.h` selects
-  `SimpleOrderBook` (depth) vs a depth-free `NoDepthBook` (verbatim
-  `perform_callback` minus the `DepthOrderBook` base); shared with `liqui_perf`.
+- **One canonical depth build.** Pull-based depth measured the same as the old
+  no-depth experiment, so the duplicate target matrix was removed.
 - **Perf output.** `perf/bench_log.h` — self-contained ANSI-color reporter (spdlog
   was tried and **removed**: its bundled fmt fails clang's `consteval`). Banner shows
   engine / depth / core / reps; babo also prints `pin_node capacity`.
@@ -209,11 +199,9 @@ Get one or two friends to run step 2–3 too (see `UPUTE_ZA_PRIJATELJA.txt` +
 ### To do next session (in order)
 1. **Rebuild from a fresh CMake configure** — NOT done since the spdlog removal and
    the depth-default change. Confirm a clean build + `ctest` green. **Gating item.**
-2. **Refresh the numbers:** run `babo_perf` / `liqui_perf` scenarios (depth-on
-   default); optionally `-DBABO_BUILD_NODEPTH=ON` for the depth on/off table and
-   `-DBABO_BUILD_PIN_SWEEP=ON` for the capacity sweep. Then `regen_references` +
-   `compare_engines` (depth doesn't change the report stream, so hashes should be
-   unchanged — verify).
+2. **Refresh the numbers:** run `babo_perf` / `liqui_perf` scenarios; optionally
+   enable `-DBABO_BUILD_PIN_SWEEP=ON` for the capacity sweep. Then
+   `regen_references` + `compare_engines` and verify all hashes.
 3. **The paper / write-up** (portfolio, not academic — frame accordingly):
    mechanism (O(1) PIN cancel vs O(n) `find_on_market`), the derived-depth story
    (nearly-free depth babo can do and liquibook structurally can't), the anti-cheat

@@ -27,7 +27,7 @@ from pathlib import Path
 # Reuse the portable-perf helpers (env/cpu/ram/git/compiler/sha) so there is one
 # source of truth for machine metadata.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import run_portable_perf as rpp  # noqa: E402
+import _script_utils as utils  # noqa: E402
 
 SCALEROW_RE = re.compile(
     r"SCALEROW\s+engine=(\S+)\s+size=(\d+)\s+levels=(\d+)\s+depth=(\d+)\s+"
@@ -36,7 +36,7 @@ SCALEROW_RE = re.compile(
 
 def default_label() -> str:
     """A descriptive machine tag from OS + CPU model (not the arbitrary hostname)."""
-    cpu = rpp.cpu_name()
+    cpu = utils.cpu_name()
     cpu = re.sub(r"\(R\)|\(TM\)|\(r\)|\(tm\)|®|™", "", cpu)
     cpu = re.sub(r"\bwith Radeon Graphics\b", "", cpu, flags=re.IGNORECASE)
     cpu = re.sub(r"\b(CPU|Processor)\b", "", cpu, flags=re.IGNORECASE)
@@ -46,7 +46,7 @@ def default_label() -> str:
 
 
 def parse_scalerows(text: str, expected_engine: str) -> list[dict]:
-    clean = rpp.ANSI_RE.sub("", text).replace("\r", "")
+    clean = utils.ANSI_RE.sub("", text).replace("\r", "")
     rows = []
     for m in SCALEROW_RE.finditer(clean):
         if m.group(1) != expected_engine:
@@ -73,7 +73,7 @@ def run_engine(binary: Path, engine: str, args, bundle: Path) -> list[dict]:
     if args.max:
         cmd += ["--max", str(args.max)]
     print(f"Running {engine}: {' '.join(cmd[1:])}", flush=True)
-    rc, output = rpp.run_text(cmd, cwd=binary.parent)
+    rc, output = utils.run_text(cmd, cwd=binary.parent)
     (bundle / f"raw_{engine}.txt").write_text(output, encoding="utf-8")
     if rc != 0:
         raise RuntimeError(f"{binary.name} failed ({rc}); see raw_{engine}.txt")
@@ -190,8 +190,8 @@ def main() -> int:
     repo = script.parent.parent
     build_dir = Path(args.build_dir).resolve()
     perf_dir = build_dir / "perf" if (build_dir / "perf").is_dir() else build_dir
-    babo_bin = rpp.find_binary(build_dir, "babo_scaling")
-    liqui_bin = rpp.find_binary(build_dir, "liqui_scaling")
+    babo_bin = utils.find_binary(build_dir, "babo_scaling")
+    liqui_bin = utils.find_binary(build_dir, "liqui_scaling")
 
     parent = Path(args.output_dir).resolve() if args.output_dir else perf_dir / "results"
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -215,24 +215,24 @@ def main() -> int:
             "speedup": (l["ns_per_cancel"] / b["ns_per_cancel"]) if b["ns_per_cancel"] else 0.0,
         })
 
-    mem = rpp.memory_bytes()
+    mem = utils.memory_bytes()
     svg_name = "scaling.svg"
     meta = {
         "created_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
         "generated_by": "scripts/run_scaling.py",
-        "runner_sha256": rpp.sha256(script),
+        "runner_sha256": utils.sha256(script),
         "label": args.label, "levels": args.levels, "reps": args.reps,
         "sizes": sizes, "svg_name": svg_name,
         "machine": {"os": platform.platform(), "system": platform.system(),
-                    "architecture": platform.machine(), "cpu": rpp.cpu_name(),
+                    "architecture": platform.machine(), "cpu": utils.cpu_name(),
                     "logical_cpus": os.cpu_count(), "memory_bytes": mem,
                     "memory_gib": round(mem / 2**30, 2) if mem else None,
                     "python": platform.python_version()},
-        "compiler": rpp.compiler_metadata(build_dir),
-        "git": rpp.git_metadata(repo),
+        "compiler": utils.compiler_metadata(build_dir),
+        "git": utils.git_metadata(repo),
         "binaries": {
-            "babo_scaling": {"sha256": rpp.sha256(babo_bin)},
-            "liqui_scaling": {"sha256": rpp.sha256(liqui_bin)},
+            "babo_scaling": {"sha256": utils.sha256(babo_bin)},
+            "liqui_scaling": {"sha256": utils.sha256(liqui_bin)},
         },
     }
 
@@ -246,7 +246,7 @@ def main() -> int:
 
     artifacts = sorted(p for p in bundle.iterdir() if p.is_file() and p.name != "MANIFEST.sha256")
     (bundle / "MANIFEST.sha256").write_text(
-        "".join(f"{rpp.sha256(p)}  {p.name}\n" for p in artifacts), encoding="ascii")
+        "".join(f"{utils.sha256(p)}  {p.name}\n" for p in artifacts), encoding="ascii")
     archive = Path(shutil.make_archive(str(bundle), "zip", root_dir=bundle))
     print(f"\nResult bundle: {bundle}\nShareable ZIP:  {archive}\n")
     print((bundle / "report.md").read_text(encoding="utf-8"))

@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import run_portable_perf as rpp  # noqa: E402  (reuse env/cpu/git/sha helpers)
+import _script_utils as utils  # noqa: E402
 
 DEFAULT_SCENARIOS = ["normal", "swing25", "flash_crash_40", "flash_crash_60"]
 DISPLAY = {"static": "Static", "normal": "Normal", "swing25": "Swing-25",
@@ -42,7 +42,7 @@ SERIES_COLORS = ["#1769aa", "#d95f02", "#1b9e77", "#7570b3", "#e7298a"]
 
 def default_label() -> str:
     """Descriptive machine tag from OS + CPU model (not the arbitrary hostname)."""
-    cpu = rpp.cpu_name()
+    cpu = utils.cpu_name()
     cpu = re.sub(r"\(R\)|\(TM\)|\(r\)|\(tm\)|®|™", "", cpu)
     cpu = re.sub(r"\bwith Radeon Graphics\b", "", cpu, flags=re.IGNORECASE)
     cpu = re.sub(r"\b(CPU|Processor)\b", "", cpu, flags=re.IGNORECASE)
@@ -58,10 +58,10 @@ PERFROW_RE = re.compile(
 
 def run_cell(binary: Path, scenario: str, count: int, reps: int) -> dict:
     cmd = [str(binary), "--scenario", scenario, "--count", str(count), "--reps", str(reps)]
-    rc, out = rpp.run_text(cmd, cwd=binary.parent)
+    rc, out = utils.run_text(cmd, cwd=binary.parent)
     if rc != 0:
         raise RuntimeError(f"{binary.name} {scenario}@{count} failed ({rc}):\n{out}")
-    m = PERFROW_RE.search(rpp.ANSI_RE.sub("", out))
+    m = PERFROW_RE.search(utils.ANSI_RE.sub("", out))
     if not m:
         raise RuntimeError(f"no PERFROW for {binary.name} {scenario}@{count}:\n{out}")
     return {"scenario": m.group(2), "num_new": int(m.group(3)), "messages": int(m.group(4)),
@@ -159,7 +159,7 @@ def main() -> int:
     repo = script.parent.parent
     build_dir = Path(args.build_dir).resolve()
     perf_dir = build_dir / "perf" if (build_dir / "perf").is_dir() else build_dir
-    bins = {name: rpp.find_binary(build_dir, exe) for name, exe in ENGINES}
+    bins = {name: utils.find_binary(build_dir, exe) for name, exe in ENGINES}
 
     parent = Path(args.output_dir).resolve() if args.output_dir else perf_dir / "results"
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -216,18 +216,18 @@ def main() -> int:
                 for i, s in enumerate(scenarios)])
 
     # ---- metadata + outputs -------------------------------------------------
-    mem = rpp.memory_bytes()
+    mem = utils.memory_bytes()
     meta = {
         "created_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
         "generated_by": "scripts/run_market_matrix.py",
-        "runner_sha256": rpp.sha256(script), "label": label,
+        "runner_sha256": utils.sha256(script), "label": label,
         "scenarios": scenarios, "counts": counts, "reps": args.reps, "metric": args.metric,
-        "machine": {"os": platform.platform(), "cpu": rpp.cpu_name(),
+        "machine": {"os": platform.platform(), "cpu": utils.cpu_name(),
                     "logical_cpus": os.cpu_count(),
                     "memory_gib": round(mem / 2**30, 2) if mem else None,
                     "python": platform.python_version()},
-        "compiler": rpp.compiler_metadata(build_dir), "git": rpp.git_metadata(repo),
-        "binaries": {name: {"sha256": rpp.sha256(p)} for name, p in bins.items()},
+        "compiler": utils.compiler_metadata(build_dir), "git": utils.git_metadata(repo),
+        "binaries": {name: {"sha256": utils.sha256(p)} for name, p in bins.items()},
     }
 
     (bundle / "results.json").write_text(json.dumps({"metadata": meta, "results": rows}, indent=2) + "\n",
@@ -266,7 +266,7 @@ def main() -> int:
 
     artifacts = sorted(p for p in bundle.iterdir() if p.is_file() and p.name != "MANIFEST.sha256")
     (bundle / "MANIFEST.sha256").write_text(
-        "".join(f"{rpp.sha256(p)}  {p.name}\n" for p in artifacts), encoding="ascii")
+        "".join(f"{utils.sha256(p)}  {p.name}\n" for p in artifacts), encoding="ascii")
     archive = Path(shutil.make_archive(str(bundle), "zip", root_dir=bundle))
     print(f"\nResult bundle: {bundle}\nShareable ZIP:  {archive}\n")
     print((bundle / "report.md").read_text(encoding="utf-8"))

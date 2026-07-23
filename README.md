@@ -39,6 +39,10 @@ cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
 cmake --build cmake-build-release -j
 ```
 
+`cmake-build-release` is only an example build-directory name. You may choose
+any directory with CMake's `-B` option; use that same path anywhere the examples
+refer to `cmake-build-release`.
+
 > **Windows + LLVM/clang:** add `-DCMAKE_RC_COMPILER="C:/Program Files/LLVM/bin/llvm-rc.exe"` to the configure step.
 
 The default build contains one canonical babobook configuration: pull-based depth
@@ -159,38 +163,6 @@ sweep is retained as a robustness check, not as a tuned source of the headline r
 
 ---
 
-## Portable compiler/OS result bundle
-
-The portable runner executes both canonical perf binaries through all five market
-states, using one warmup plus 100 measured replays per state. It generates a
-shareable ZIP containing Markdown, CSV, JSON, raw console output, environment
-metadata, git revision/dirty status, compiler and CMake configuration, binary
-SHA-256 hashes, and a manifest.
-
-Windows:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\run_portable_perf.ps1 `
-  -BuildDir cmake-build-release `
-  -Label "alice-windows-clang"
-```
-
-Linux/macOS:
-
-```bash
-scripts/run_portable_perf.sh \
-  --build-dir cmake-build-release \
-  --label "alice-linux-gcc"
-```
-
-The default is deliberately the full `5 scenarios × 100 reps × 2 books` matrix.
-Liquibook's static case can make this an overnight run. For a quick installation
-check, use `-Reps 1 -Scenarios normal` on PowerShell or
-`--reps 1 --scenarios normal` on the shell wrapper. Send the generated ZIP under
-`<build>/perf/results/`; do not manually transcribe the table.
-
----
-
 ## Throughput matrix: market regimes × message-scale (the paper figure)
 
 The headline report. It sweeps both engines across the four dynamic market
@@ -208,7 +180,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run_market_matrix.ps1 -BuildDir
 ```
 ```bash
 # Linux / macOS / git-bash
-scripts/run_market_matrix.sh --build-dir cmake-build-release
+bash scripts/run_market_matrix.sh --build-dir cmake-build-release
 ```
 
 Flags: `--scenarios a,b`, `--counts 1000,...,2000000`, `--reps N` (default 10),
@@ -246,7 +218,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run_scaling.ps1 -BuildDir cmake
 ```
 ```bash
 # Linux / macOS / git-bash
-scripts/run_scaling.sh --build-dir cmake-build-release
+bash scripts/run_scaling.sh --build-dir cmake-build-release
 ```
 
 `--label` defaults to `OS-CPU model` (e.g. `Windows-AMD Ryzen 7 7730U`); pass
@@ -360,7 +332,7 @@ the state audit to `PASS`.
 | `benchmark/` | the plugin **harness** + the C-ABI contract (`api/matching_engine_api.h`) |
 | `benchmark/adapters/` | each order book wrapped behind the ABI as a canonical shared lib |
 | `perf/` | two canonical, core-pinned throughput binaries plus opt-in capacity variants |
-| `scripts/` | correctness, comparison, payload-scaling, and portable result-bundle runners |
+| `scripts/` | correctness/ABI runners plus throughput-matrix and cancel-scaling result runners |
 | `test/` | unit tests (`babo_unit`, `liqui_unit`) |
 | `docs/API_CONTRACT.md` | public complexity, threading, lifetime, numeric, and listener contract |
 

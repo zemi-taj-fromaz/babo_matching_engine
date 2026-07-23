@@ -114,7 +114,7 @@ Three layers, decoupled by the C ABI:
   purely by order id. Handles new/cancel/replace/market-price,
   IOC, AON, and stop orders (parked in separate `narb_tree`s keyed by stop price).
   Emits canonical order-domain events through one id-based `OrderListener`.
-  Depth is **pull-based**: `depth()` (compiled out under `BABO_NO_DEPTH`) derives the
+  Depth is **pull-based**: `depth()` derives the
   top-SIZE aggregate on demand by walking the tree's best-first level threads and
   reading each `price_level_descriptor`'s `_quantity`/`_count` — nothing on the hot
   path. (The old eager `Depth` + `std::map` excess tracker was removed.)
@@ -124,7 +124,7 @@ Three layers, decoupled by the C ABI:
   region, intrusive prev/next links, O(1) insert/erase (slots never move). This is
   the cache-aware structure that gives babo its O(1) cancel (vs liquibook's O(n)
   `find_on_market` scan — the source of the `static`-scenario speedup).
-- `memory/memory_pool.h`, `simple/simple_order.h`, `book/depth.h` — arena, order
+- `memory/memory_pool.h`, `book/simple_order.h`, `book/depth.h` — arena, order
   value type, and a passive top-of-book depth **snapshot** (filled by the walk in
   `matching_book::depth()`; no per-op maintenance).
 - **Threading/lifetime contract:** all books in one process share two unsynchronized
@@ -157,9 +157,10 @@ Three layers, decoupled by the C ABI:
   no-depth experiment within run-to-run variation, so the duplicate target matrix
   was removed. `-DBABO_BUILD_PIN_SWEEP=ON` adds only `babo_cap{16,32,128}_perf`;
   capacity 64 is the canonical `babo_perf`.
-- **Portable perf bundle.** `scripts/run_portable_perf.{py,ps1,sh}` runs both
-  canonical books across all five scenarios and emits shareable Markdown/CSV/JSON,
-  raw outputs, compiler/OS/CPU/build metadata, binary hashes, manifest, and ZIP.
+- **Performance result bundles.** `scripts/run_market_matrix` measures throughput
+  across dynamic scenarios and message scales; `scripts/run_scaling` measures
+  cancel latency against resting-book size. Both emit shareable Markdown/CSV/JSON,
+  charts, compiler/OS/CPU/build metadata, binary hashes, manifests, and ZIPs.
 - **Perf output.** `perf/bench_log.h` — self-contained ANSI-color reporter (spdlog
   was tried and **removed**: its bundled fmt fails clang's `consteval`). Banner shows
   engine / depth / core / reps; babo also prints `pin_node capacity`.
