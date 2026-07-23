@@ -31,8 +31,9 @@ So the data is comparable, every machine must run the **same commit** with the
    git checkout <paper-data-tag>
    git status            # must be clean; bundles record dirty=true otherwise
    ```
-2. Build (Release) and run both bundles — see `UPUTE_ZA_PRIJATELJA.txt` in the
-   repo root for the plug-in-the-charger / close-heavy-apps checklist:
+2. Build (Release) and run both bundles. See `scripts/README.md` for the runner
+   commands and `perf/README.md` for the measurement and machine-isolation
+   methodology:
    ```bash
    cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
    cmake --build cmake-build-release --target babo_perf liqui_perf babo_scaling liqui_scaling -j
@@ -53,24 +54,15 @@ python3 paper/data/aggregate.py     # writes paper/data/AGGREGATE.md
 
 ## Measurement-condition notes
 
-- **Disable CPU boost before measuring (fixed base clock).** Base-to-boost is
-  ~2× on these laptop parts (e.g. 2.0 vs 4.5 GHz), and boost cannot be sustained
-  across a multi-minute sweep, so an unlocked core reports the *same* workload at
-  wildly different rates (≈8 vs ≈17 M msgs/s) depending only on thermal state.
-  Fix the clock at base so every cell — and every machine — is comparable:
-  - **Windows:** `powercfg /setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PERFBOOSTMODE 0`
-    then `powercfg /setactive SCHEME_CURRENT` (restore with `PERFBOOSTMODE 2`).
-    Note: on AMD, `PROCTHROTTLEMAX 99` alone does **not** disable boost.
-  - **Linux:** `echo 0 | sudo tee /sys/devices/system/cpu/cpufreq/boost`
-    (Intel pstate: `echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo`).
-  - **Apple Silicon:** no boost-lock or core-pin control — measure at stock and
-    flag the bundle as unpinned/unlocked.
-
-  Verify it took: a repeated `babo_perf --scenario normal --reps 20` should read
-  flat (no 2× jumps). Plug in AC and close heavy apps regardless.
-- **Apple Silicon** runs cannot pin to a core (affinity is an ignored hint), so
-  those bundles print `could not pin to core 5`. Valid data points — a different,
-  *harder* measurement condition — but flag them as unpinned when interpreting.
+- Use the same declared boost/SMT/isolation policy for both engines.
+- Plug in AC power, disable low-power mode, close heavy applications, and keep
+  thermal conditions stable.
+- The binaries request CPU affinity and real-time priority automatically; the
+  result output records whether those requests succeeded.
+- Boost control, Linux boot-time isolation, and SMT control are manual optional
+  steps documented in `perf/README.md`.
+- macOS affinity is a scheduler hint, not binding to a numbered CPU. Record
+  macOS/Apple Silicon runs as unpinned when interpreting cross-machine data.
 - Numbers here come from the **core-pinned perf binaries** (direct-linked engine,
   no adapter/transport). Correctness is certified separately by the **harness**
   (SHA-256 report-stream match + state audit); see the repo README.

@@ -191,6 +191,151 @@ performance core, stop background services, disable SMT, or disable CPU
 turbo/boost. Those are external machine-preparation choices and must be reported
 with published results.
 
+## Optional machine isolation
+
+The result scripts do not change system configuration. They only launch the
+perf binaries, which make the affinity and priority requests described above.
+Everything in this section is optional and must be performed manually.
+
+There are two reasonable measurement policies:
+
+- **Stock:** leave boost, SMT, and the normal scheduler enabled. This represents
+  ordinary user performance but usually has more run-to-run clock variation.
+- **Controlled:** disable boost and reduce scheduler interference. This improves
+  repeatability but is less representative of normal machine operation.
+
+Use the same policy for both engines and record it with the result. Before
+changing any setting, record its current value so it can be restored exactly.
+Do not assume the example “restore” value was the machine's original setting.
+
+### Power and thermal conditions
+
+- Use AC power and disable battery/low-power mode.
+- Close CPU-heavy applications and background builds.
+- Keep the cooling configuration and room conditions unchanged.
+- Avoid comparing one cold run with one thermally saturated run.
+- Run Babobook and Liquibook back-to-back; the matrix runner already alternates
+  them within each scenario/size cell.
+
+### Disable and restore CPU boost
+
+Windows exposes processor boost mode through the active power scheme. Run an
+elevated PowerShell or Command Prompt:
+
+```powershell
+powercfg /query SCHEME_CURRENT SUB_PROCESSOR PERFBOOSTMODE
+powercfg /setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PERFBOOSTMODE 0
+powercfg /setactive SCHEME_CURRENT
+```
+
+Save the value reported by `powercfg /query`. Restore that exact value after
+testing; for example, only use `2` if `2` was the original value:
+
+```powershell
+powercfg /setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PERFBOOSTMODE 2
+powercfg /setactive SCHEME_CURRENT
+```
+
+On Linux, the available interface depends on the CPU frequency driver. Check
+which file exists before writing anything:
+
+```bash
+test -e /sys/devices/system/cpu/cpufreq/boost && \
+  cat /sys/devices/system/cpu/cpufreq/boost
+
+test -e /sys/devices/system/cpu/intel_pstate/no_turbo && \
+  cat /sys/devices/system/cpu/intel_pstate/no_turbo
+```
+
+For drivers exposing `cpufreq/boost`, `0` disables boost and `1` enables it:
+
+```bash
+echo 0 | sudo tee /sys/devices/system/cpu/cpufreq/boost
+# restore the previously recorded value, commonly:
+echo 1 | sudo tee /sys/devices/system/cpu/cpufreq/boost
+```
+
+For Intel P-state, the meaning is inverted: `1` disables turbo and `0` allows
+it:
+
+```bash
+echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo
+# restore the previously recorded value, commonly:
+echo 0 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo
+```
+
+macOS provides no supported project-level switch for disabling boost. Measure
+on AC power with Low Power Mode disabled and report that macOS controlled the
+clock. Apple Silicon also has no SMT.
+
+Disabling boost does not necessarily fix one exact frequency. Governors,
+thermal limits, power limits, and heterogeneous cores can still change the
+clock.
+
+### Linux boot-time CPU isolation
+
+For stricter Linux measurements, one logical CPU can be removed from ordinary
+scheduler work with kernel command-line parameters. The perf binaries currently
+request logical CPU `5`, so a matching example is:
+
+```text
+isolcpus=5 nohz_full=5 rcu_nocbs=5
+```
+
+These are boot parameters, not shell commands. Configure them through the
+system's bootloader, regenerate the bootloader configuration when required, and
+reboot. Keep at least one non-isolated housekeeping CPU. Verify the active
+command line after reboot:
+
+```bash
+cat /proc/cmdline
+```
+
+`isolcpus` reduces normal scheduler placement but does not guarantee a perfectly
+quiet CPU. Interrupts, kernel work, firmware activity, and an SMT sibling can
+still interfere. IRQ affinity and housekeeping configuration are system-specific
+and should not be changed casually on a general-purpose workstation.
+
+### SMT / Hyper-Threading
+
+SMT lets two logical CPUs share one physical core. A busy sibling can disturb a
+single-thread benchmark even when the benchmark thread itself is pinned.
+
+The least ambiguous option is to disable SMT/Hyper-Threading in BIOS/UEFI and
+record that choice. Some Linux systems also expose a runtime control:
+
+```bash
+cat /sys/devices/system/cpu/smt/control
+echo off | sudo tee /sys/devices/system/cpu/smt/control
+# restore only if the recorded original state was enabled:
+echo on | sudo tee /sys/devices/system/cpu/smt/control
+```
+
+The file and accepted values are kernel/platform dependent. Disabling SMT can
+renumber or offline logical CPUs, so verify that CPU `5` still exists:
+
+```bash
+lscpu -e=CPU,CORE,SOCKET,ONLINE
+```
+
+On Windows, use firmware settings if SMT must be disabled. On Apple Silicon,
+there is no SMT to disable.
+
+### What to record
+
+At minimum, record:
+
+- boost/turbo enabled or disabled;
+- SMT enabled or disabled;
+- affinity and real-time-priority success or failure from program output;
+- OS, CPU, compiler, build type, and Git revision;
+- whether Linux boot-time isolation was used;
+- AC/battery and low-power-mode state.
+
+The result bundles already capture OS, CPU, compiler, build, Git, binary hashes,
+and raw program output. They cannot reliably detect firmware boost/SMT settings,
+power mode, or boot-time isolation, so those facts must be supplied separately.
+
 ## Recommended measurement conditions
 
 - Use a `Release` build and keep the compiler/configuration identical for both
