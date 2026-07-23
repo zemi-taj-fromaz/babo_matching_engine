@@ -1,8 +1,8 @@
 # Third-party software notices
 
 This project contains or builds against third-party software. Those components
-remain under their own licenses; the project's own license does not replace
-them. The list below records the provenance of the code used by the benchmark.
+remain under their own licenses. This file records their provenance and points
+to the applicable license text.
 
 ## Matching Engine Algorithm Performance Challenge
 
@@ -11,10 +11,7 @@ them. The list below records the provenance of the code used by the benchmark.
   infrastructure under `benchmark/` was adapted from this project.
 - License: MIT License.
 - Copyright: Copyright (c) 2026 Flash One Technologies LLC.
-- Local license text: [`benchmark/LICENSE`](benchmark/LICENSE).
-
-The upstream copyright and permission notice must remain with copies or
-substantial portions of the adapted software.
+- License text: [`benchmark/LICENSE`](benchmark/LICENSE).
 
 ## Liquibook
 
@@ -24,32 +21,35 @@ substantial portions of the adapted software.
   plus the notice covering its 2018 ease-of-use adjustments.
 - Copyright: Copyright (c) 2012, 2013 Object Computing, Inc.; adjustments
   copyright 2018 Dendi Suhubdy.
-- Local license text: [`libs/liquibook/LICENSE.txt`](libs/liquibook/LICENSE.txt).
-
-Source redistributions must retain the notices, conditions, and disclaimer.
-Binary redistributions must reproduce them in accompanying documentation or
-materials. The copyright holders' and contributors' names may not be used to
-endorse this project without prior written permission.
+- License text: [`libs/liquibook/LICENSE.txt`](libs/liquibook/LICENSE.txt).
 
 ## Rigtorp SPSCQueue
 
 - Upstream: https://github.com/rigtorp/SPSCQueue
-- Use here: report transport used by the benchmark harness; downloaded by CMake
-  `FetchContent` at configure time.
+- Use here: report transport used by the benchmark harness.
+- Distribution: downloaded by CMake `FetchContent` at configure time.
 - License: MIT License.
 - Copyright: Copyright (c) 2018 Erik Rigtorp.
-- Local license text: [`third_party/licenses/SPSCQueue-LICENSE.txt`](third_party/licenses/SPSCQueue-LICENSE.txt).
 
-The upstream copyright and permission notice must remain with copies or
-substantial portions of the software.
+The downloaded source contains its upstream `LICENSE` file.
 
-## Other dependencies
+## GoogleTest
 
-GoogleTest is downloaded for the test binaries through CMake `FetchContent` and
-is governed by its own upstream license. The public-domain SHA-256 implementation
-used by the harness is identified in its source header and in
+- Upstream: https://github.com/google/googletest
+- Use here: unit-test framework only.
+- Distribution: downloaded by CMake `FetchContent` at configure time.
+- License: BSD 3-Clause.
+- Copyright: Copyright 2008, Google Inc.
+
+The downloaded source contains its upstream `LICENSE` file.
+
+## SHA-256
+
+The benchmark uses the public-domain SHA-256 implementation in
+`benchmark/third_party/sha256.c` and `benchmark/third_party/sha256.h`. Its
+public-domain status is stated directly in both source headers and in
 [`benchmark/LICENSE`](benchmark/LICENSE).
 
-This notice is an attribution and distribution aid, not legal advice. When a
-release includes source or binaries containing third-party code, ship the
-applicable full license texts with that release as well.
+This notice is an attribution and distribution aid, not legal advice. Binary or
+source releases must include any full license texts required by the applicable
+third-party licenses.

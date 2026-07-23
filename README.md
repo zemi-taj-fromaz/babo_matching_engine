@@ -92,9 +92,6 @@ The example source and its consumer-side CMake setup are in
 [`libs/babobook/examples/`](libs/babobook/examples/). `babobook` itself is a
 header-only CMake target; linking it propagates the include path and C++20
 requirement without adding a library binary.
-Complexity guarantees, the precise meaning of O(1) cancel, threading and
-reentrancy rules, ownership/pool lifetime, numeric limits, listener ordering, and
-depth snapshot lifetime are documented in [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md).
 
 ---
 
@@ -334,8 +331,6 @@ the state audit to `PASS`.
 | `perf/` | two canonical, core-pinned throughput binaries plus opt-in capacity variants |
 | `scripts/` | correctness/ABI runners plus throughput-matrix and cancel-scaling result runners |
 | `test/` | unit tests (`babo_unit`, `liqui_unit`) |
-| `third_party/licenses/` | collected licenses and notices for vendored and fetched dependencies |
-| `docs/API_CONTRACT.md` | public complexity, threading, lifetime, numeric, and listener contract |
 
 ### How babo is fast
 
