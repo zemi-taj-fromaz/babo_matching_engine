@@ -57,12 +57,6 @@ cmake --build <build-dir> --target \
 Release builds are mandatory for publishable performance numbers. Compiler and
 optimization policy belongs in `cmake/CompilerSettings.cmake`.
 
-On Windows with LLVM/Clang, configuration may require:
-
-```text
--DCMAKE_RC_COMPILER="C:/Program Files/LLVM/bin/llvm-rc.exe"
-```
-
 `-DBABO_BUILD_PIN_SWEEP=ON` adds the non-default
 `babo_cap{16,32,128}_perf` targets. The canonical `babo_perf` uses capacity 64.
 
